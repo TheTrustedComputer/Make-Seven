@@ -4,7 +4,7 @@
 	This is a computer implementation of Pressman Toy's Make Seven, a Connect Four-like game involving elementary additon.
 	The objective of this game is to drop numbers that add up to seven in a vertical, horizontal, or diagonal matter.
 
-	Make Seven ships 11 one tiles, 11 two tiles, and 4 three tiles per player--totaling 52 tiles.
+	Make Seven ships 11 one tiles, 11 two tiles, and 4 three tiles per player, totaling 52 tiles.
 	This structure enforces them so that when any player runs out of tiles, they may not drop any more of them.
 
 	Below is a visual illustration on how the playing board is represented internally inside this data structure:
@@ -25,6 +25,7 @@
 	 *  | Empty (1, 2, 3)
 */
 
+// Header guards
 #ifndef MAKESEVEN_H
 #define MAKESEVEN_H
 
@@ -56,6 +57,12 @@ static int MakeSeven_userNumberTile, MakeSeven_inputReadyFlag;
 
 // Move variation to store the best move given the root position (Left four bits = Tile #; Right four bits = Column #)
 static uint8_t MakeSeven_variation[MAKESEVEN_AREA];
+
+// Maximum and minimum diagonal slope bitshift tables to always stay in bitboard bounds
+const int8_t MIN_MSLOPE_BITSHIFT_TABLE[55] = {0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 14, 0, 2, 3, 4, 5, 6, 14, 22, 0, 3, 4, 5, 6, 14, 22, 30, 0, 4, 5, 6, 14, 22, 30, 38, 0, 5, 6, 14, 22, 30, 38, 46, 0, 6, 14, 22, 30, 38, 46, 54};
+const int8_t MAX_MSLOPE_BITSHIFT_TABLE[55] = {0, 8, 16, 24, 32, 40, 48, 0, 8, 16, 24, 32, 40, 48, 49, 0, 16, 24, 32, 40, 48, 49, 50, 0, 24, 32, 40, 48, 49, 50, 51, 0, 32, 40, 48, 49, 50, 51, 52, 0, 40, 48, 49, 50, 51, 52, 53, 0, 48, 49, 50, 51, 52, 53, 54};
+const int8_t MIN_PSLOPE_BITSHIFT_TABLE[55] = {0, 1, 2, 3, 4, 5, 6, 0, 8, 0, 1, 2, 3, 4, 5, 0, 16, 8, 0, 1, 2, 3, 4, 0, 24, 16, 8, 0, 1, 2, 3, 0, 32, 24, 16, 8, 0, 1, 2, 0, 40, 32, 24, 16, 8, 0, 1, 0, 48, 40, 32, 24, 16, 8, 0};
+const int8_t MAX_PSLOPE_BITSHIFT_TABLE[55] = {54, 46, 38, 30, 22, 14, 6, 0, 53, 54, 46, 38, 30, 22, 14, 0, 52, 53, 54, 46, 38, 30, 22, 0, 51, 52, 53, 54, 46, 38, 30, 0, 50, 51, 52, 53, 54, 46, 38, 0, 49, 50, 51, 52, 53, 54, 46, 0, 48, 49, 50, 51, 52, 53, 54};
 
 // The core Make Seven structure in which all movements and calculations are performed here.
 typedef struct {
@@ -89,7 +96,7 @@ bool MakeSeven_sequence(MakeSeven*, const char*);			// Make moves from a string 
 
 // Other functions
 uint64_t MakeSeven_hashEncode(MakeSeven*);					// Encode a hashed Make Seven position for use in the transposition table.
-void MakeSeven_reverse(uint64_t*);							// Reverse bitboards of the playing grid and then recompute the heights.
-bool MakeSeven_symmetrical(MakeSeven*);						// Is the board's left side the same as its right side when flipped horizontally?
+uint64_t MakeSeven_reverse(uint64_t);						// Returns the reverse of a Make Seven grid bitboard.
+bool MakeSeven_symmetrical(const MakeSeven*);				// Is the board's left side the same as its right side when flipped horizontally?
 
 #endif

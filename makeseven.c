@@ -21,8 +21,7 @@ int intlog2(uint64_t x) {
 		return INT_MIN; // lim x->0+ = -inf
 	}
 	int y = 0;
-	while (x > 1ull) {
-		x >>= 1ull;
+	while (x >>= 1ull) {
 		++y;
 	}
 	return y;
@@ -39,9 +38,9 @@ int popcount(uint64_t x) {
 
 void MakeSeven_initialize(MakeSeven *ms) {
 	int i;
-
+	
 	ms->playerTiles[0] = ms->playerTiles[1] = 0ull;
-	ms->twoAndThreeTiles[0] = ms->twoAndThreeTiles[1] = 0ull;
+	ms->twoAndThreeTiles[0] = ms->twoAndThreeTiles[1] = 0ull; 
 	ms->remainingTiles[0] = ms->remainingTiles[1] = 0xbb; // Eleven in hexadecimal
 	ms->remainingTiles[2] = 0x44;
 	ms->plyNumber = 0;
@@ -55,93 +54,108 @@ void MakeSeven_print(const MakeSeven *ms) {
 	uint8_t numOneTiles, numTwoTiles, numThreeTiles;
 	int i, j, turn = ms->plyNumber & 1;
 	uint64_t bit, ONE_TILES = (ms->playerTiles[0] | ms->playerTiles [1]) ^ (ms->twoAndThreeTiles[0] | ms->twoAndThreeTiles[1]);
-
-#ifdef _WIN32
+	
+#ifdef _WIN32  // Get console handle
 	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
 #endif
-	if (turn) {
+	if (turn) { // Colorize coordinates on whose turn it is
 #ifdef _WIN32
-		SetConsoleTextAttribute(handle, 0xe);
+		SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 #else
 		printf("\e[1;93m");
 #endif
 	}
 	else {
 #ifdef _WIN32
-		SetConsoleTextAttribute(handle, 0xa);
+		SetConsoleTextAttribute(handle, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
 #else
 		printf("\e[1;92m");
 #endif
 	}
+	// Print coordinates
 	for (i = 0; i < MAKESEVEN_SIZE; ++i) {
 		printf("%c ", i + 'A');
-
 	}
 #ifdef _WIN32
-	SetConsoleTextAttribute(handle, 0x7);
+	SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
 #else
 	printf("\e[0m");
 #endif
 	puts("");
+	
+	// Print playing grid
 	for (i = MAKESEVEN_SIZE - 1; i >= 0; --i) {
 		for (j = 0; j < MAKESEVEN_SIZE; ++j) {
-			bit = intpow(2, (uint64_t)(MAKESEVEN_SIZE + 1) * j) * intpow(2, i);
-			if (bit & ms->playerTiles[0]) {
-				if (bit & ONE_TILES) {
+			// Compute tile bit position
+			bit = ((uint64_t)(1ull) << (MAKESEVEN_SIZE_P1 * j)) * ((uint64_t)(1ull) << i); 
+			if (bit & ms->playerTiles[0]) { // Green's tiles
+				if (bit & ONE_TILES) { // 1 tile
 #ifdef _WIN32
-					SetConsoleTextAttribute(handle, 0xa);
-					printf("1 ");
+					SetConsoleTextAttribute(handle, BACKGROUND_GREEN | BACKGROUND_INTENSITY);
+					printf("1");
+					SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+					printf(" ");
 #else
 					printf("\e[1;7;92m1\e[0m ");
 #endif
 				}
-				else if (bit & ms->twoAndThreeTiles[0]) {
+				else if (bit & ms->twoAndThreeTiles[0]) { // 2 tile
 #ifdef _WIN32
-					SetConsoleTextAttribute(handle, 0xa);
-					printf("2 ");
+					SetConsoleTextAttribute(handle, BACKGROUND_GREEN | BACKGROUND_INTENSITY);
+					printf("2");
+					SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+					printf(" ");
 #else
 					printf("\e[1;7;92m2\e[0m ");
 #endif
 				}
-				else {
+				else { // 3 tile
 #ifdef _WIN32
-					SetConsoleTextAttribute(handle, 0xa);
-					printf("3 ");
+					SetConsoleTextAttribute(handle, BACKGROUND_GREEN | BACKGROUND_INTENSITY);
+					printf("3");
+					SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+					printf(" ");
 #else
 					printf("\e[1;7;92m3\e[0m ");
 #endif
 				}
 			}
-			else if (bit & ms->playerTiles[1]) {
-				if (bit & ONE_TILES) {
+			else if (bit & ms->playerTiles[1]) { // Yellow's tiles
+				if (bit & ONE_TILES) { // 1 tile
 #ifdef _WIN32
-					SetConsoleTextAttribute(handle, 0xe);
-					printf("1 ");
+					SetConsoleTextAttribute(handle, BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_INTENSITY);
+					printf("1");
+					SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+					printf(" ");
 #else
 					printf("\e[1;7;93m1\e[0m ");
 #endif
 				}
-				else if (bit & ms->twoAndThreeTiles[0]) {
+				else if (bit & ms->twoAndThreeTiles[0]) { // 2 tile
 #ifdef _WIN32
-					SetConsoleTextAttribute(handle, 0xe);
-					printf("2 ");
+					SetConsoleTextAttribute(handle, BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_INTENSITY);
+					printf("2");
+					SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+					printf(" ");
 #else
 					printf("\e[1;7;93m2\e[0m ");
 #endif
 				}
-				else {
+				else { // 3 tile
 #ifdef _WIN32
-					SetConsoleTextAttribute(handle, 0xe);
-					printf("3 ");
+					SetConsoleTextAttribute(handle, BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_INTENSITY);
+					printf("3");
+					SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+					printf(" ");
 #else
 					printf("\e[1;7;93m3\e[0m ");
 #endif
 				}
 			}
 			else {
-				if (bit & MAKESEVEN_THREES) {
+				if (bit & MAKESEVEN_THREES) { // Simulate red stickers on cells where 3 tiles are supposed to drop
 #ifdef _WIN32
-					SetConsoleTextAttribute(handle, 0xc);
+					SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_INTENSITY);
 					printf(". ");
 #else
 					printf("\e[91m. \e[0m");
@@ -149,7 +163,7 @@ void MakeSeven_print(const MakeSeven *ms) {
 				}
 				else {
 #ifdef _WIN32
-					SetConsoleTextAttribute(handle, 0xd);
+					SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
 					printf(". ");
 #else
 					printf("\e[95m. \e[0m");
@@ -159,7 +173,7 @@ void MakeSeven_print(const MakeSeven *ms) {
 		}
 		if (i) {
 #ifdef _WIN32
-			SetConsoleTextAttribute(handle, 0x7);
+			SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
 #else
 			printf("\e[0m");
 #endif
@@ -167,27 +181,29 @@ void MakeSeven_print(const MakeSeven *ms) {
 		}
 	}
 #ifdef _WIN32
-	SetConsoleTextAttribute(handle, 0x7);
+	SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
 #endif
-	numOneTiles = turn ? (ms->remainingTiles[0] & 0xf0) >> 4 : ms->remainingTiles[0] & 0xf;
-	numTwoTiles = turn ? (ms->remainingTiles[1] & 0xf0) >> 4 : ms->remainingTiles[1] & 0xf;
-	numThreeTiles = turn ? (ms->remainingTiles[2] & 0xf0) >> 4 : ms->remainingTiles[2] & 0xf;
+	// Print remaining tiles
+	numOneTiles = turn ? (ms->remainingTiles[0] >> 4) : (ms->remainingTiles[0] & 0xf);
+	numTwoTiles = turn ? (ms->remainingTiles[1] >> 4) : (ms->remainingTiles[1] & 0xf);
+	numThreeTiles = turn ? (ms->remainingTiles[2] >> 4) : (ms->remainingTiles[2] & 0xf);
 	printf("\n1:%u 2:%u 3:%u\n", numOneTiles, numTwoTiles, numThreeTiles);
 }
 
 bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 	if (ms->plyNumber) {
 		uint64_t ALL_TWOTILES_BITMASK, ALL_THREETILES_BITMASK, PLAYER_TILES_BITMASK, PLAYER_ONETILES_BITMASK, PLAYER_TWOTILES_BITMASK, PLAYER_THREETILES_BITMASK, tileBit;
-		uint8_t MOVES_HISTORY, PLY_M1, NUMTILE_HEIGHT, NUMTILE_DIGIT, NUMTILE_COLUMN, TURN, shiftSwitcher, bitShifter, sum, currentAdjacent0, currentAdjacent1, adjacentTiles[24];
-		int8_t MIN_VERT_BITSHIFT, MAX_VERT_BITSHIFT, MAX_HORI_BITSHIFT, MIN_PSLOPE_BITSHIFT, MAX_PSLOPE_BITSHIFT, MIN_MSLOPE_BITSHIFT, MAX_MSLOPE_BITSHIFT, direction, nextDir, relativeTile, relativeOffset;
-		bool finishedLeftOrDown, finishedRightOrUp;
-
+		int currentAdjacent, adjacentsLD, adjacentsRU, totalTiles, adjacentLeftDown[MAKESEVEN_SIZE_M1], adjacentRightUp[MAKESEVEN_SIZE_M1], adjacentTiles[MAKESEVEN_SIZE];
+		uint8_t MOVES_HISTORY, PLY_M1, NUMTILE_HEIGHT, NUMTILE_DIGIT, NUMTILE_COLUMN, TURN, shiftSwitcher, bitShifter;
+		int8_t MIN_VERT_BITSHIFT, MIN_MSLOPE_BITSHIFT, MAX_MSLOPE_BITSHIFT, MIN_PSLOPE_BITSHIFT, MAX_PSLOPE_BITSHIFT, direction, relativeTile, relativeOffset;
+		bool finishedLeftOrDown;
+		
 		// Variables initialization
-		PLY_M1 = ms->plyNumber - 1u;
-		TURN = PLY_M1 & 1u;
+		PLY_M1 = ms->plyNumber - 1;
+		TURN = PLY_M1 & 1;
 		MOVES_HISTORY = ms->movesHistory[PLY_M1];
 		NUMTILE_HEIGHT = ms->height[MOVES_HISTORY & 0xf] - 1;
-		NUMTILE_DIGIT = (MOVES_HISTORY & 0xf0) >> 4;
+		NUMTILE_DIGIT = MOVES_HISTORY >> 4;
 		NUMTILE_COLUMN = NUMTILE_HEIGHT / MAKESEVEN_SIZE_P1;
 		ALL_TWOTILES_BITMASK = ms->twoAndThreeTiles[0];
 		ALL_THREETILES_BITMASK = ms->twoAndThreeTiles[1];
@@ -195,33 +211,16 @@ bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 		PLAYER_ONETILES_BITMASK = PLAYER_TILES_BITMASK ^ (PLAYER_TILES_BITMASK & (ALL_TWOTILES_BITMASK | ALL_THREETILES_BITMASK));
 		PLAYER_TWOTILES_BITMASK = PLAYER_TILES_BITMASK & ALL_TWOTILES_BITMASK;
 		PLAYER_THREETILES_BITMASK = PLAYER_TILES_BITMASK & ALL_THREETILES_BITMASK;
-		shiftSwitcher = 0;
-
-		// Maximum/minimum vertical and horizontal shift boundaries to avoid wraparound
 		MIN_VERT_BITSHIFT = NUMTILE_COLUMN * MAKESEVEN_SIZE_P1;
-		MAX_VERT_BITSHIFT = (NUMTILE_COLUMN + 1) * MAKESEVEN_SIZE_P1 - 2;
-		MAX_HORI_BITSHIFT = 54;
-
-		// The diagonals require slightly more computational work to get bounds correct
-		MIN_PSLOPE_BITSHIFT = MAX_PSLOPE_BITSHIFT = MIN_MSLOPE_BITSHIFT = MAX_MSLOPE_BITSHIFT = NUMTILE_HEIGHT;
-		while (!((1ull << (MAX_MSLOPE_BITSHIFT + MAKESEVEN_SIZE)) & MAKESEVEN_TOP) && (MAX_MSLOPE_BITSHIFT <= 46)) {
-			MAX_MSLOPE_BITSHIFT += MAKESEVEN_SIZE;
-		}
-		while (!((1ull << (MIN_MSLOPE_BITSHIFT - MAKESEVEN_SIZE)) & MAKESEVEN_TOP) && (MIN_MSLOPE_BITSHIFT >= MAKESEVEN_SIZE)) {
-			MIN_MSLOPE_BITSHIFT -= MAKESEVEN_SIZE;
-		}
-		while (!((1ull << (MAX_PSLOPE_BITSHIFT + MAKESEVEN_SIZE_P2)) & MAKESEVEN_TOP) && (MAX_PSLOPE_BITSHIFT <= 45)) {
-			MAX_PSLOPE_BITSHIFT += MAKESEVEN_SIZE_P2;
-		}
-		while (!((1ull << (MIN_PSLOPE_BITSHIFT - MAKESEVEN_SIZE_P2)) & MAKESEVEN_TOP) && (MIN_PSLOPE_BITSHIFT >= MAKESEVEN_SIZE_P2)) {
-			MIN_PSLOPE_BITSHIFT -= MAKESEVEN_SIZE_P2;
-		}
-
-		// First adjacent tile is itself
+		MIN_MSLOPE_BITSHIFT = MIN_MSLOPE_BITSHIFT_TABLE[NUMTILE_HEIGHT];
+		MAX_MSLOPE_BITSHIFT = MAX_MSLOPE_BITSHIFT_TABLE[NUMTILE_HEIGHT];
+		MIN_PSLOPE_BITSHIFT = MIN_PSLOPE_BITSHIFT_TABLE[NUMTILE_HEIGHT];
+		MAX_PSLOPE_BITSHIFT = MAX_PSLOPE_BITSHIFT_TABLE[NUMTILE_HEIGHT];
+		shiftSwitcher = 0;
 		adjacentTiles[0] = NUMTILE_DIGIT;
-
+		
 		Label_nextDirectionShifter:
-		// The program needs to test for all four possible directions to make seven
+		// Test all four directions.
 		switch (shiftSwitcher) {
 		case 0:
 			bitShifter = 1; // Vertical shift (|)
@@ -235,136 +234,191 @@ bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 		case 3:
 			bitShifter = MAKESEVEN_SIZE_P2; // Positive sloped diagonal shift (/)
 		}
-
-		//Reset found adjacent tiles
-		for (currentAdjacent0 = 1; currentAdjacent0 < 24; ++currentAdjacent0) {
-			adjacentTiles[currentAdjacent0] = 0;
-		}
-
-		// Flags to stop after finding any opponent or empty tiles
-		finishedLeftOrDown = finishedRightOrUp = false;
-		direction = -1;
-		currentAdjacent0 = 1;
-		relativeOffset = bitShifter * direction;
-
-		// Go left first from the last dropped tile, then go right
-		for (nextDir = 0; !(finishedLeftOrDown && finishedRightOrUp) && (nextDir < 6) && (direction <= 1); ++nextDir) {
-			relativeTile = NUMTILE_HEIGHT + relativeOffset;
-			tileBit = 1ull << relativeTile;
-
-			// Do not go out of bounds
+		
+		// Flags to stop after finding any opponent or empty tiles.
+		finishedLeftOrDown = false;
+		adjacentsLD = adjacentsRU = direction = -1;
+		totalTiles = 1;
+		relativeOffset = 0;
+		
+		// Find all adjacent tiles and store them in the adjacentTiles array.
+		for (;;) {
+			// Get tile bit and relative offset when positive
+			tileBit = 1ull << (relativeTile = NUMTILE_HEIGHT + (relativeOffset += bitShifter * direction));
+			
+			// Do not go out of bounds; break out of the loop after searching in all directions.
 			switch (bitShifter) {
 			case 1:
-				if (relativeTile < MIN_VERT_BITSHIFT) {
-					finishedLeftOrDown = true;
-					nextDir = -1;
-					goto Label_resetBounds;
-				}
-				if (relativeTile > MAX_VERT_BITSHIFT) {
-					finishedRightOrUp = true;
-					goto Label_resetBounds;
+				// The last dropped tile is always on top of another and nothing is above it; therefore, there is no need to check tiles above it.
+				if (finishedLeftOrDown || (relativeTile < MIN_VERT_BITSHIFT)) {
+					goto Label_endTilesLoop;
 				}
 				goto Label_tilesSumToSeven;
 			case MAKESEVEN_SIZE_P1:
-				if (relativeTile < 0) {
-					finishedLeftOrDown = true;
-					nextDir = -1;
-					goto Label_resetBounds;
+				if (relativeTile < 0) { // Min horizontal shift
+					break;
 				}
-				if (relativeTile > MAX_HORI_BITSHIFT) {
-					finishedRightOrUp = true;
-					goto Label_resetBounds;
+				if (relativeTile > 54) { // Max horizontal shift
+					goto Label_endTilesLoop;
 				}
 				goto Label_tilesSumToSeven;
 			case MAKESEVEN_SIZE:
+				// Computing maximum and minimum diagonal shift bounds takes O(n) time with O(1) space, where n is the number of cells in that direction.
+				// Using a precomputed table allowed a 25% decrease in solving time that takes O(1) time but with O(n) space.
 				if (relativeTile < MIN_MSLOPE_BITSHIFT) {
-					finishedLeftOrDown = true;
-					nextDir = -1;
-					goto Label_resetBounds;
+					break;
 				}
 				if (relativeTile > MAX_MSLOPE_BITSHIFT) {
-					finishedRightOrUp = true;
-					goto Label_resetBounds;
+					goto Label_endTilesLoop;
 				}
 				goto Label_tilesSumToSeven;
 			case MAKESEVEN_SIZE_P2:
 				if (relativeTile < MIN_PSLOPE_BITSHIFT) {
-					finishedLeftOrDown = true;
-					nextDir = -1;
-					goto Label_resetBounds;
+					break;
 				}
 				if (relativeTile > MAX_PSLOPE_BITSHIFT) {
-					finishedRightOrUp = true;
-					goto Label_resetBounds;
+					goto Label_endTilesLoop;
 				}
 				goto Label_tilesSumToSeven;
 			}
-
-			Label_resetBounds:
+			
+			finishedLeftOrDown = true;
+			// Start going in the opposite direction.
+			Label_goRightOrUp:
 			direction += 2;
 			relativeOffset = 0;
-			goto Label_continueStatement;
-
+			continue;
+			
 			Label_tilesSumToSeven:
-			// No exploring after reaching the end
-			if (finishedLeftOrDown && (direction == -1)) {
-				goto Label_resetBounds;
+			if (PLAYER_ONETILES_BITMASK & tileBit) { // Found one tiles
+				(direction == 1) ? (adjacentRightUp[++adjacentsRU] = 1) : (adjacentLeftDown[++adjacentsLD] = 1);
+				++totalTiles;
+			}	
+			else if (PLAYER_TWOTILES_BITMASK & tileBit) { // Found two tiles
+				(direction == 1) ? (adjacentRightUp[++adjacentsRU] = 2) : (adjacentLeftDown[++adjacentsLD] = 2);
+				++totalTiles;
 			}
-
-			// Found one tiles
-			if (PLAYER_ONETILES_BITMASK & tileBit) {
-				adjacentTiles[currentAdjacent0++] = 1;
-			}
-			// Found two tiles
-			else if (PLAYER_TWOTILES_BITMASK & tileBit) {
-				adjacentTiles[currentAdjacent0++] = 2;
-			}
-			// Found three tiles
-			else if (PLAYER_THREETILES_BITMASK & tileBit) {
-				adjacentTiles[currentAdjacent0++] = 3;
+			else if (PLAYER_THREETILES_BITMASK & tileBit) { // Found three tiles
+				(direction == 1) ? (adjacentRightUp[++adjacentsRU] = 3) : (adjacentLeftDown[++adjacentsLD] = 3);
+				++totalTiles;
 			}
 			else { // Found nothing or opponent tiles
 				if (direction == 1) {
-					finishedRightOrUp = true;
+					break; // Finished going right or up; break out of the loop.
 				}
 				else {
 					finishedLeftOrDown = true;
-					goto Label_resetBounds;
+					goto Label_goRightOrUp;
 				}
 			}
-
-			Label_continueStatement:
-			// Increment the bit shifting mechanism
-			switch (shiftSwitcher) {
-			case 0:
-				relativeOffset += 1 * direction;
-				break;
-			case 1:
-				relativeOffset += MAKESEVEN_SIZE_P1 * direction;
-				break;
-			case 2:
-				relativeOffset += MAKESEVEN_SIZE * direction;
-				break;
-			case 3:
-				relativeOffset += MAKESEVEN_SIZE_P2 * direction;
+		}
+		
+		Label_endTilesLoop:
+		// Miniumum number of adjacent tiles is 3.
+		if (totalTiles >= 3) {
+			// Copy found adjacent tiles from both directions into the adjacentTiles array in left to right fashion.
+			for (currentAdjacent = 0; adjacentsLD >= 0; ++currentAdjacent) {
+				adjacentTiles[currentAdjacent] = adjacentLeftDown[adjacentsLD--];
+			}
+			for (adjacentTiles[currentAdjacent++] = NUMTILE_DIGIT; adjacentsRU >= 0; ++currentAdjacent) {
+				adjacentTiles[currentAdjacent] = adjacentRightUp[adjacentsRU--];
+			}
+			// Remaining adjacent tiles are set to zeros as they were not found during the search.
+			while (currentAdjacent < MAKESEVEN_SIZE) {
+				adjacentTiles[currentAdjacent++] = 0;
+			}
+			
+			// Sum all found adjacent tiles and see if they "Make 7".
+			// There are eight ways of adding to 7 given numbers 1, 2, and 3:
+			//
+			// 1. 3+3+1 = 7
+			// 2. 3+2+2 = 7
+			// 3. 3+2+1+1 = 7
+			// 4. 3+1+1+1+1 = 7
+			// 5. 2+2+2+1 = 7
+			// 6. 2+2+1+1+1 = 7
+			// 7. 2+1+1+1+1+1 = 7
+			// 8. 1+1+1+1+1+1+1 = 7
+			//
+			// Addition is commutative, so they can be in any order: 3+3+1 = 3+1+3 = 1+3+3 = 7
+			// This would have been in a loop but is unrolled to maximize performance and skip unnecessary checks.
+			//
+			// 3 adjacent tiles
+			// 3+3+1 3+2+2
+			// [1][2][3][4]: All matching tiles equal target sum: [3+3+1], [2+2+3]
+			//  ^  ^  ^
+			if ((adjacentTiles[0] + adjacentTiles[1] + adjacentTiles[2]) == 7) {
+				return true;
+			}
+			// [1][2][3][4]: One non-matching tile: 2+[3+3+1], 1+[2+2+3], 2+[2+2+3]
+			//     ^  ^  ^
+			if ((adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3]) == 7) { 
+				return true;
+			}
+			
+			// 4 adjacent tiles
+			// 3+2+1+1 2+2+2+1
+			// [1][2][3][4][5][6][7]: [2+2+2+1]
+			//  ^  ^  ^  ^
+			if ((adjacentTiles[0] + adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3]) == 7) {
+				return true;
+			}
+			// [1][2][3][4][5][6][7]: 2+[2+2+2+1]
+			//     ^  ^  ^  ^
+			if ((adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4]) == 7) {
+				return true;
+			}
+			// [1][2][3][4][5][6][7]: 2+2+[2+2+2+1]
+			//        ^  ^  ^  ^
+			if ((adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4] + adjacentTiles[5]) == 7) {
+				return true;
+			}
+			// [1][2][3][4][5][6][7]: 2+2+2+[2+2+2+1]
+			//           ^  ^  ^  ^
+			if ((adjacentTiles[3] + adjacentTiles[4] + adjacentTiles[5] + adjacentTiles[6]) == 7) {
+				return true;
+			}
+			
+			// 5 adjacent tiles
+			// 3+1+1+1+1; 2+2+1+1+1
+			// [1][2][3][4][5][6]: [3+1+1+1+1], [2+2+1+1+1]
+			//  ^  ^  ^  ^  ^
+			if ((adjacentTiles[0] + adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4]) == 7) {
+				return true;
+			}
+			// [1][2][3][4][5][6]: 1+[2+1+1+1+2], 1+[1+2+1+1+2], 1+[1+1+2+1+2], 1+[1+1+1+2+2]
+			//     ^  ^  ^  ^  ^
+			if ((adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4] + adjacentTiles[5]) == 7) {
+				return true;
+			}
+			
+			// 6 adjacent tiles
+			// 2+1+1+1+1+1
+			// [1][2][3][4][5][6][7]: [2+1+1+1+1+1]
+			//  ^  ^  ^  ^  ^  ^
+			if ((adjacentTiles[0] + adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4] + adjacentTiles[5]) == 7) {
+				return true;
+			}
+			// [1][2][3][4][5][6][7]: 1+[1+1+1+1+1+2]
+			//     ^  ^  ^  ^  ^  ^
+			if ((adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4] + adjacentTiles[5] + adjacentTiles[6]) == 7) {
+				return true;
+			}
+			
+			// 7 adjacent tiles
+			// [1][2][3][4][5][6][7]: [1+1+1+1+1+1+1]
+			//  ^  ^  ^  ^  ^  ^  ^
+			if ((adjacentTiles[0] + adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4] + adjacentTiles[5] + adjacentTiles[6]) == 7) {
+				return true;
 			}
 		}
-
-		// Sum all the tiles and see if they "Make 7"
-		for (currentAdjacent0 = 0; adjacentTiles[currentAdjacent0] && (currentAdjacent0 < 23); ++currentAdjacent0) {
-			sum = adjacentTiles[currentAdjacent0];
-			for (currentAdjacent1 = currentAdjacent0 + 1; adjacentTiles[currentAdjacent1] && (sum <= 7) && (currentAdjacent1 < 24); ++currentAdjacent1) {
-				if ((sum += adjacentTiles[currentAdjacent1]) == 7) {
-					return true;
-				}
-			}
-			sum = 0; // Reset sum to zero when it is not seven
-		}
-
-		if ((++shiftSwitcher) <= 3) { // Switch directions and repeat
+		// Switch directions and repeat.
+		if ((++shiftSwitcher) <= 3) {
 			goto Label_nextDirectionShifter;
 		}
 	}
+	
+	// Either no tiles made seven, or the grid was empty.
 	return false;
 }
 
@@ -373,29 +427,25 @@ bool MakeSeven_gameOver(const MakeSeven *ms) {
 }
 
 bool MakeSeven_hasNoMoreMoves(const MakeSeven *ms) {
-	int i;
+	int t;
 	uint8_t remaining[3];
 
 	// Get the number of remaining tiles for that player
-	for (i = 0; i < 3; ++i) {
-		remaining[i] = ms->plyNumber & 1u ? (ms->remainingTiles[i] & 0xf0) >> 4 : ms->remainingTiles[i] & 0xf;
+	for (t = 0; t < 3; ++t) {
+		remaining[t] = (ms->plyNumber & 1u) ? (ms->remainingTiles[t] >> 4) : (ms->remainingTiles[t] & 0xf);
 	}
 
-	// Does the current player has no more 1 and 2 tiles left?
-	if (!(remaining[0] || remaining[1])) {
-		// The player does not. Does the board state allows droppable the 3 tiles? If so, the player to move is able to drop them in this case.
-		return !(remaining[2] && ((ms->playerTiles[0] | ms->playerTiles[1]) + MAKESEVEN_BOT) & MAKESEVEN_THREES);
-	}
-
-	// The player has droppable 1 or 2 tiles. Play it through until the former condition is met.
-	return false;
+	// Does the current player has 1 and 2 tiles left?
+	// Yes: Play it through until the latter condition from below is met.
+	// No: Does the board state allows droppable 3 tiles? If so, the player to move is able to drop them in this case.
+	return (remaining[0] || remaining[1]) ? false : !(remaining[2] && ((ms->playerTiles[0] | ms->playerTiles[1]) + MAKESEVEN_BOT) & MAKESEVEN_THREES);
 }
 
 bool MakeSeven_drop(MakeSeven *ms, const int NUM_TILE, const int COLUMN) {
 	// Turn on a single bit that drops a number tile to that column.
 	uint64_t droppedTile = 1ull << ms->height[COLUMN];
-	int NUM_TILE_M1 = NUM_TILE - 1;
-	uint8_t turn = ms->plyNumber & 1u, tileAmount = turn ? (ms->remainingTiles[NUM_TILE_M1] & 0xf0) >> 4 : ms->remainingTiles[NUM_TILE_M1] & 0xf, tileAmountBitmask;
+	int NUM_TILE_M1 = NUM_TILE - 1, NUM_TILE_M2 = NUM_TILE - 2;
+	uint8_t turn = ms->plyNumber & 1u, tileAmount = turn ? (ms->remainingTiles[NUM_TILE_M1] >> 4) : (ms->remainingTiles[NUM_TILE_M1] & 0xf);
 
 	// Is the column not full of tiles, and does the player have any tiles left?
 	if (!(droppedTile & MAKESEVEN_TOP) && tileAmount) {
@@ -409,62 +459,72 @@ bool MakeSeven_drop(MakeSeven *ms, const int NUM_TILE, const int COLUMN) {
 
 		// This drop is legal. Now bitwise-or it with the bitmap of that player's dropped tiles.
 		ms->playerTiles[turn] |= droppedTile;
+		
 		// The MakeSeven structure does not have any means of saving one tiles in memory; check if this tile is not a 1 and bitwise-or to the two-and-three tiles variable.
 		// If no bit in twoAndThreeTiles are flipped on and there is a bit in playerTiles at the same spot, then it is guaranteed to be a 1 tile.
-		if (NUM_TILE_M1) {
-			ms->twoAndThreeTiles[NUM_TILE_M1 - 1] |= droppedTile;
+		if (NUM_TILE_M1) { 
+			ms->twoAndThreeTiles[NUM_TILE_M2] |= droppedTile;
 		}
-		ms->movesHistory[ms->plyNumber++] = COLUMN | (NUM_TILE << 4);												// Store this move to the move variation history.
-		++ms->height[COLUMN];																						// Increase the column height where the tile was dropped in.
-		tileAmountBitmask = turn ? ms->remainingTiles[NUM_TILE_M1] & 0xf : ms->remainingTiles[NUM_TILE_M1] & 0xf0;	// Save bits containing the amount of opponent's number tiles.
-		ms->remainingTiles[NUM_TILE_M1] = tileAmountBitmask | (--tileAmount << (turn << 2));						// Deduct that number's remaining tiles from the given player.
+
+		// Store this move to the move variation history.
+		ms->movesHistory[ms->plyNumber++] = COLUMN | (NUM_TILE << 4);
+		// Increase the column height where the tile was dropped in.
+		++ms->height[COLUMN];
+		// Deduct that number's remaining tiles from the given player.
+		ms->remainingTiles[NUM_TILE_M1] = (turn ? (ms->remainingTiles[NUM_TILE_M1] & 0xf) : (ms->remainingTiles[NUM_TILE_M1] & 0xf0)) | (--tileAmount << (turn << 2));
+
+		// Sucessful drop.
 		return true;
 	}
+
+	// Illegal drop.
 	return false;
 }
 
 void MakeSeven_undrop(MakeSeven *ms) {
 	// Retrieve the last move from the movesHistory array and also retrieve that tile
-	uint8_t lastDroppedHeight = ms->movesHistory[--ms->plyNumber] & 0xf, turn = ms->plyNumber & 1u, lastNumberTile, tileAmount, tileAmountBitmask;
-	lastNumberTile = ((ms->movesHistory[ms->plyNumber] & 0xf0) >> 4) - 1;
+	uint8_t lastDroppedHeight = ms->movesHistory[--ms->plyNumber] & 0xf, turn = ms->plyNumber & 1u, lastNumberTile, numberTileM1, tileAmount;
+	numberTileM1 = (lastNumberTile = (ms->movesHistory[ms->plyNumber] >> 4) - 1) - 1;
 	ms->playerTiles[turn] ^= 1ull << --ms->height[lastDroppedHeight];
 
 	// Do not turn off this bit if the last tile played is a 1 tile
 	if (lastNumberTile) {
-		ms->twoAndThreeTiles[lastNumberTile - 1] ^= 1ull << ms->height[lastDroppedHeight];
+		ms->twoAndThreeTiles[numberTileM1] ^= 1ull << ms->height[lastDroppedHeight];
 	}
 
 	// Reverse the drop move to the state before it occurred
-	tileAmount = turn ? (ms->remainingTiles[lastNumberTile] & 0xf0) >> 4 : ms->remainingTiles[lastNumberTile] & 0xf;
-	tileAmountBitmask = turn ? ms->remainingTiles[lastNumberTile] & 0xf : ms->remainingTiles[lastNumberTile] & 0xf0;
-	ms->remainingTiles[lastNumberTile] = tileAmountBitmask | (++tileAmount << (turn << 2));
+	tileAmount = turn ? (ms->remainingTiles[lastNumberTile] >> 4) : (ms->remainingTiles[lastNumberTile] & 0xf);
+	ms->remainingTiles[lastNumberTile] = (turn ? (ms->remainingTiles[lastNumberTile] & 0xf) : (ms->remainingTiles[lastNumberTile] & 0xf0)) | (++tileAmount << (turn << 2));
 }
 
 bool MakeSeven_getUserCharInput(MakeSeven *ms, const char INPUT) {
-	int number = INPUT - '0', column = INPUT - 'A', caseTest;
-	if (MakeSeven_inputReadyFlag) {
-		// Use case-insensitive input
-		for (caseTest = 0; caseTest < 2; ++caseTest) {
-			if (column >= 0 && column < MAKESEVEN_SIZE) {
-				MakeSeven_inputReadyFlag = 0;
-				return MakeSeven_drop(ms, MakeSeven_userNumberTile, column);
+	int number = INPUT - '0', column = INPUT - 'A', caseTest; // Uppercase
+	if (!MakeSeven_gameOver(ms)) {
+		if (MakeSeven_inputReadyFlag) {
+			// Use case-insensitive input
+			for (caseTest = 0; caseTest < 2; ++caseTest) {
+				if (column >= 0 && column < MAKESEVEN_SIZE) {
+					MakeSeven_inputReadyFlag = 0;
+					return MakeSeven_drop(ms, MakeSeven_userNumberTile, column);
+				}
+				column = INPUT - 'a'; // Lowercase
 			}
-			column = INPUT - 'a';
 		}
-	}
-	else {
-	    if (number > 0 && number <= 3) {
-			MakeSeven_userNumberTile = number;
-			MakeSeven_inputReadyFlag = 1;
-			return true;
-	    }
+		else {
+			// Check tile number input range
+			if ((number > 0) && (number <= 3)) { 
+				MakeSeven_userNumberTile = number;
+				MakeSeven_inputReadyFlag = 1;
+				return true;
+			}
+		}
 	}
 	return false;
 }
 
 bool MakeSeven_sequence(MakeSeven *ms, const char *SEQ) {
-	for (int i = 0; SEQ[i]; ++i) {
-		if (!MakeSeven_getUserCharInput(ms, SEQ[i])) {
+	for (int s = 0; SEQ[s]; ++s) {
+		if (!MakeSeven_getUserCharInput(ms, SEQ[s])) {
 			return false;
 		}
 	}
@@ -473,4 +533,22 @@ bool MakeSeven_sequence(MakeSeven *ms, const char *SEQ) {
 
 uint64_t MakeSeven_hashEncode(MakeSeven *ms) {
 	return ms->playerTiles[ms->plyNumber & 1u] + ms->playerTiles[0] + ms->playerTiles[1] + MAKESEVEN_BOT;
+}
+
+uint64_t MakeSeven_reverse(uint64_t grid) {
+	uint64_t revGrid, revCols;
+	for (revGrid = 0ull, revCols = MAKESEVEN_SIZE_M1; grid; grid >>= MAKESEVEN_SIZE_P1, --revCols) {
+		revGrid |= (grid & MAKESEVEN_LCL) << (revCols * MAKESEVEN_SIZE_P1);
+	}
+	return revGrid;
+}
+
+bool MakeSeven_symmetrical(const MakeSeven *ms) {
+	uint64_t revTiles[4] = { ms->playerTiles[0], ms->playerTiles[1], ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1] }, r;
+	// Reverse player tiles and number tiles
+	for (r = 0; r < 4; ++r) {
+		revTiles[r] = MakeSeven_reverse(revTiles[r]);
+	}
+	// Test original and reversed to see if they are identical
+	return (revTiles[0] == ms->playerTiles[0]) && (revTiles[1] == ms->playerTiles[1]) && (revTiles[2] == ms->twoAndThreeTiles[0]) && (revTiles[3] == ms->twoAndThreeTiles[1]);
 }

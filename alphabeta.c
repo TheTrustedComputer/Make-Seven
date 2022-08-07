@@ -1,17 +1,17 @@
 #include "alphabeta.h"
 
 void AlphaBeta_getColumnMoveOrder(void) {
-	for (int i = 0; i < 7; ++i) {
+	for (int i = 0; i < 7; ++i) { // Center to outermost
 		moveOrder[i] = 7 / 2 + (1 - 2 * (i & 1)) * (i + 1) / 2;
 	}
 }
 
 bool AlphaBeta_checkForSeven(MakeSeven *ms) {
 	int i, j;
+	// Make all possible drops and check for sum of seven, then undo the drops
 	for (i = 1; i <= 3; ++i) {
 		for (j = 0; j < 7; ++j) {
 			if (MakeSeven_drop(ms, i, j)) {
-				//MakeSeven_print(ms);
 				if (MakeSeven_tilesSumToSeven(ms)) {
 					MakeSeven_undrop(ms);
 					return true;
@@ -26,15 +26,19 @@ bool AlphaBeta_checkForSeven(MakeSeven *ms) {
 int AlphaBeta_negamax(MakeSeven *ms, int depth, int alpha, int beta) {
 	int parentScore, childScore, i, j;
 	++nodes;
+	// See if the score is in the transposition table
 	if (abs((tableScore = TranspositionTable_load(&table, (hash = MakeSeven_hashEncode(ms)), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1]))) >= AB_WIN) {
 		return tableScore;
 	}
+	// Check for a "Make 7"
 	if (AlphaBeta_checkForSeven(ms)) {
 		return AB_WIN;
 	}
+	// Check if the player cannot make any more moves
 	if (MakeSeven_hasNoMoreMoves(ms)) {
 		return AB_DRAW;
 	}
+	// Check if hit maxiumum depth
 	if (!depth) {
 		return AB_UNKNOWN;
 	}
@@ -42,19 +46,23 @@ int AlphaBeta_negamax(MakeSeven *ms, int depth, int alpha, int beta) {
 	for (i = 4; --i;) {
 		for (j = 0; j < 7; ++j) {
 			if (MakeSeven_drop(ms, i, moveOrder[j])) {
+				// Drop tiles and see if our score beats the current best score
 				if ((childScore = -AlphaBeta_negamax(ms, depth - 1, -beta, -alpha)) > parentScore) {
 					parentScore = childScore;
 				}
 				MakeSeven_undrop(ms);
+				// Update best score if it's better than the current best, and store that score
 				if (alpha < parentScore) {
 					TranspositionTable_store(&table, (hash = MakeSeven_hashEncode(ms)), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1], (alpha = parentScore));
 				}
+				// Alpha cut-off
 				if (alpha >= beta) {
 					return alpha;
 				}
 			}
 		}
 	}
+	// Store current score in the transposition table for later lookup
 	TranspositionTable_store(&table, (hash = MakeSeven_hashEncode(ms)), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1], alpha);
 	return alpha;
 }
@@ -192,6 +200,9 @@ Result AlphaBeta_solve(MakeSeven *ms, const bool VERBOSE) {
 }
 
 void Result_print(Result *current, Result *best) {
+#ifdef _WIN32 
+	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+#endif
 	switch (current->wdl) {
 	default:
 	case UNKNOWN_CHAR:
@@ -200,45 +211,105 @@ void Result_print(Result *current, Result *best) {
 		break;
 	case DRAW_CHAR:
 		if (best && best->wdl == current->wdl) {
+#ifdef _WIN32 
+			SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+			printf("%c ", DRAW_CHAR);
+			SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+#else
 			printf("\e[1;33m%c\e[0m ", DRAW_CHAR);
+#endif
 		}
 		else {
+#ifdef _WIN32 
+			SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN);
+			printf("%c ", DRAW_CHAR);
+			SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+#else
 			printf("\e[0;33m%c\e[0m ", DRAW_CHAR);
+#endif
 		}
 		break;
 	case WIN_CHAR:
 		if (current->dt7) {
 			if (best && best->dt7 == current->dt7 && best->wdl == current->wdl) {
+#ifdef _WIN32 
+				SetConsoleTextAttribute(handle, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+				printf("%c%d ", current->wdl, current->dt7);
+				SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+#else
 				printf("\e[1;32m%c%d\e[0m ", current->wdl, current->dt7);
+#endif
 			}
 			else {
+#ifdef _WIN32 
+				SetConsoleTextAttribute(handle, FOREGROUND_GREEN);
+				printf("%c%d ", current->wdl, current->dt7);
+				SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+#else
 				printf("\e[0;32m%c%d\e[0m ", current->wdl, current->dt7);
+#endif
 			}
 		}
 		else {
 			if (best && best->dt7 == current->dt7 && best->wdl == current->wdl) {
+#ifdef _WIN32
+				SetConsoleTextAttribute(handle, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+				printf("%s ", WIN_TEXT);
+				SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+#else
 				printf("\e[1;32m%s\e[0m ", WIN_TEXT);
+#endif
 			}
 			else {
+#ifdef _WIN32
+				SetConsoleTextAttribute(handle, FOREGROUND_GREEN);
+				printf("%s ", WIN_TEXT);
+				SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+#else
 				printf("\e[0;32m%s\e[0m ", WIN_TEXT);
+#endif
 			}
 		}
 		break;
 	case LOSS_CHAR:
 		if (current->dt7) {
 			if (best && best->dt7 == current->dt7 && best->wdl == current->wdl) {
+#ifdef _WIN32
+				SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_INTENSITY);
+				printf("%c%d ", current->wdl, current->dt7);
+				SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+#else
 				printf("\e[1;31m%c%d\e[0m ", current->wdl, current->dt7);
+#endif
 			}
 			else {
+#ifdef _WIN32
+				SetConsoleTextAttribute(handle, FOREGROUND_RED);
+				printf("%c%d ", current->wdl, current->dt7);
+				SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+#else
 				printf("\e[0;31m%c%d\e[0m ", current->wdl, current->dt7);
+#endif
 			}
 		}
 		else {
 			if (best && best->dt7 == current->dt7 && best->wdl == current->wdl) {
+#ifdef _WIN32
+				SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_INTENSITY);
+				printf("%s ", LOSS_TEXT);
+				SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+#else
 				printf("\e[1;31m%s\e[0m ", LOSS_TEXT);
+#endif
 			}
 			else {
+#ifdef _WIN32
+				SetConsoleTextAttribute(handle, FOREGROUND_RED);
+				printf("%s ", LOSS_TEXT);
+				SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+#else
 				printf("\e[0;31m%s\e[0m ", LOSS_TEXT);
+#endif
 			}
 		}
 	}
@@ -341,7 +412,7 @@ Result Result_getBestResult(Result *r1, Result *r2, Result *r3) {
 	return best;
 }
 
-
+// 
 short Result_getBestMove(Result *r1, Result *r2, Result *r3) {
 	if (r1 && r2 && r3) {
 		int i, j;
@@ -349,7 +420,7 @@ short Result_getBestMove(Result *r1, Result *r2, Result *r3) {
 		srand(time(NULL));
 		for (i = 0; i < 3; ++i) {
 			for (j = 0; j < 7; ++j) {
-				// fixme
+				// fixme:
 			}
 		}
 		return 1;

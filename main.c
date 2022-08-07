@@ -5,9 +5,15 @@
 #include <time.h>
 #include <string.h>
 #include <limits.h>
+#include <assert.h>
+#include <signal.h>
 
 #ifdef _WIN32
 #include <windows.h>
+#include <pthread.h> // MinGW does not have the C11 threads.h header
+#elif __linux__
+#include <sys/sysinfo.h>
+#include <threads.h>
 #endif
 
 #include "makeseven.c"
@@ -15,24 +21,95 @@
 #include "alphabeta.c"
 
 int main(int argc, char **argv) {
-	// Variable declarations
+	/* Variable declarations */
+#ifdef _WIN32
+	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+#endif
+	// The Make Seven game and solution results
+	MakeSeven ms;
+	Result r, r1[7], r2[7], r3[7];
+	
+	// Character input from user
 	char input;
+	
+	// Statistics on solving time, number of positions evaluated, and best move
 	time_t stopwatch;
 	double sec, npsec;
 	short best;
-	int i;
- 	MakeSeven ms;
-	Result r, r1[7], r2[7], r3[7];
+	
+	// Flag to stop running the solver
+	int stopRunning;
+	
+#ifdef __linux__ // Linux: get host memory size using sysinfo; set transposition table size to half of host memory
+	{
+		// Structure for system information
+		struct sysinfo sysSpecs;
+		unsigned long gigs, power2;
+		
+		if (sysinfo(&sysSpecs) != -1) { // Request system information
+			// Fetch half of host memory size in gigabytes
+			gigs = sysSpecs.totalram / (1024 * 1024 * 1024) / 2;
+			// Round up to exactly a power of two
+			for (power2 = 1; power2 < gigs; power2 <<= 1);
+			// Keep asking for memory but use half of that memory if unable to get it reserved
+			while (!TranspositionTable_initialize(&table, TT_HASHSIZE * power2)) {
+				power2 >>= 1;
+			}
+		}
+		else { // Use a gigabyte if cannot get system information
+			TranspositionTable_initialize(&table, TT_HASHSIZE);
+		}
+	}
+#elif defined(_WIN32) // Windows: get host memory size using GlobalMemoryStatusEx; this works with virtual machines unlike GetPhysicallyInstalledSystemMemory
+	{	
+		MEMORYSTATUSEX memory;
+		unsigned long long kilos, upower2;
+		long gigs, power2;
+		bool success0, success1;
+		memory.dwLength = sizeof(memory);
+		
+		kilos = 0ull;
+		// Returns in kilobytes, divide by 1048576 to get gigabytes
+		success0 = GetPhysicallyInstalledSystemMemory(&kilos);
+		kilos /= 1048576;
+		// Round up to nearest power of two
+		for (upower2 = 1; upower2 < kilos; upower2 <<= 1);
 
+		gigs = 0l;
+		// A non-zero return value means it's okay; if cannot fetch installed memory size
+		success1 = GlobalMemoryStatusEx(&memory);
+		// Divide by 1024^3 to get gigabytes as it is in bytes
+		gigs = memory.ullTotalPhys / (1024 * 1024 * 1024);
+		for (power2 = 1; power2 < gigs; power2 <<= 1);
+		
+		if (success0) { // If either succeeded, initialize transposition table with half of host memory
+			for (upower2 >>= 1; !TranspositionTable_initialize(&table, TT_HASHSIZE * upower2); upower2 >>= 1);
+		}
+		else if (success1) {
+			for (power2 >>= 1; !TranspositionTable_initialize(&table, TT_HASHSIZE * power2); power2 >>= 1);
+		}
+		else { // When neither of the above worked, use a gigabyte
+			TranspositionTable_initialize(&table, TT_HASHSIZE);
+		}
+	}
+#else
+	// Default to one gigabyte on all other platforms
 	TranspositionTable_initialize(&table, TT_HASHSIZE);
+#endif
+	
+	// Prepare game and alpha-beta move ordering array
 	AlphaBeta_getColumnMoveOrder();
     MakeSeven_initialize(&ms);
-	printf("Pressman Toy Make 7 solver by TheTrustedComputer\n");
+
+	// Print greetings and details
+	printf("Pressman Toy's Make 7 solver by TheTrustedComputer\n");
 	printf("Hash table of %u entries\n", table.size);;
-	for (i = 0; !i;) {
+	
+	// Main solving loop
+	for (stopRunning = 0; !stopRunning;) {
 		if (argc >= 2) {
 			MakeSeven_sequence(&ms, argv[1]);
-			++i;
+			++stopRunning;
 			if (MakeSeven_tilesSumToSeven(&ms)) {
 				MakeSeven_print(&ms);
 				printf("%s wins!\n", ms.plyNumber & 1u ? MAKESEVEN_PLAYER1_NAME : MAKESEVEN_PLAYER2_NAME);
@@ -62,19 +139,31 @@ int main(int argc, char **argv) {
 				}
 			}
 		}
+		
 		// Print game state
 		MakeSeven_print(&ms);
+		
+		// Time the search
 		nodes = 0ull;
-
-		// Start and stop solving time
 		stopwatch = clock();
 		r = AlphaBeta_solve(&ms, true);
 		stopwatch = clock() - stopwatch;
 
-		sec = (double)stopwatch / CLOCKS_PER_SEC;
-		npsec = (double)nodes / (sec ? sec : sec + 1.0);
+		sec = (double)(stopwatch) / CLOCKS_PER_SEC;
+		npsec = (double)(nodes) / (sec ? sec : sec + 1.0);
 		printf("\a");
+#ifdef _WIN32
+		if (r.wdl == DRAW_CHAR) {
+			SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+			printf("%s ", DRAW_TEXT);
+			SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+		}
+		else {
+			Result_print(&r, &r);
+		}
+#else
 		(r.wdl == DRAW_CHAR) ? printf("\e[1;33m%s\e[0m ", DRAW_TEXT) : Result_print(&r, &r);
+#endif
 		printf("%llu %.0f %.3f\n", nodes, npsec, sec);
 		if (argc < 2) {
 			AlphaBeta_getMoveScores(&ms, r1, r2, r3, &r);
