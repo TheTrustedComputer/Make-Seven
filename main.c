@@ -102,12 +102,13 @@ int main(int argc, char **argv) {
     MakeSeven_initialize(&ms);
 
 	// Print greetings and details
-	printf("Pressman Toy's Make 7 solver by TheTrustedComputer\n");
+	printf("Make Seven solver by TheTrustedComputer\n");
 	printf("Hash table of %u entries\n", table.size);;
 	
 	// Main solving loop
 	for (stopRunning = 0; !stopRunning;) {
 		if (argc >= 2) {
+			// Get move sequence from command line arguments
 			MakeSeven_sequence(&ms, argv[1]);
 			++stopRunning;
 			if (MakeSeven_tilesSumToSeven(&ms)) {

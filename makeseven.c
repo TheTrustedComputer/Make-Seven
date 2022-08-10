@@ -87,7 +87,7 @@ void MakeSeven_print(const MakeSeven *ms) {
 	for (i = MAKESEVEN_SIZE - 1; i >= 0; --i) {
 		for (j = 0; j < MAKESEVEN_SIZE; ++j) {
 			// Compute tile bit position
-			bit = ((uint64_t)(1ull) << (MAKESEVEN_SIZE_P1 * j)) * ((uint64_t)(1ull) << i); 
+			bit = ((uint64_t)(1ul) << (MAKESEVEN_SIZE_P1 * j)) * ((uint64_t)(1ul) << i); 
 			if (bit & ms->playerTiles[0]) { // Green's tiles
 				if (bit & ONE_TILES) { // 1 tile
 #ifdef _WIN32
@@ -156,17 +156,17 @@ void MakeSeven_print(const MakeSeven *ms) {
 				if (bit & MAKESEVEN_THREES) { // Simulate red stickers on cells where 3 tiles are supposed to drop
 #ifdef _WIN32
 					SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_INTENSITY);
-					printf(". ");
+					printf("= ");
 #else
-					printf("\e[91m. \e[0m");
+					printf("\e[91m= \e[0m");
 #endif
 				}
 				else {
 #ifdef _WIN32
 					SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
-					printf(". ");
+					printf("- ");
 #else
-					printf("\e[95m. \e[0m");
+					printf("\e[95m- \e[0m");
 #endif
 				}
 			}
@@ -193,7 +193,7 @@ void MakeSeven_print(const MakeSeven *ms) {
 bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 	if (ms->plyNumber) {
 		uint64_t ALL_TWOTILES_BITMASK, ALL_THREETILES_BITMASK, PLAYER_TILES_BITMASK, PLAYER_ONETILES_BITMASK, PLAYER_TWOTILES_BITMASK, PLAYER_THREETILES_BITMASK, tileBit;
-		int currentAdjacent, adjacentsLD, adjacentsRU, totalTiles, adjacentLeftDown[MAKESEVEN_SIZE_M1], adjacentRightUp[MAKESEVEN_SIZE_M1], adjacentTiles[MAKESEVEN_SIZE];
+		int currentAdjacent, adjacentsLD, adjacentsRU, totalTiles, adjacentLeftDown[MAKESEVEN_SIZE_M1], adjacentRightUp[MAKESEVEN_SIZE_M1], adjacentTiles[MAKESEVEN_SIZE], sum012, sum12, sum123, sum2, sum3, sum34, sum345, sum3456, sum4, sum6;
 		uint8_t MOVES_HISTORY, PLY_M1, NUMTILE_HEIGHT, NUMTILE_DIGIT, NUMTILE_COLUMN, TURN, shiftSwitcher, bitShifter;
 		int8_t MIN_VERT_BITSHIFT, MIN_MSLOPE_BITSHIFT, MAX_MSLOPE_BITSHIFT, MIN_PSLOPE_BITSHIFT, MAX_PSLOPE_BITSHIFT, direction, relativeTile, relativeOffset;
 		bool finishedLeftOrDown;
@@ -235,7 +235,7 @@ bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 			bitShifter = MAKESEVEN_SIZE_P2; // Positive sloped diagonal shift (/)
 		}
 		
-		// Flags to stop after finding any opponent or empty tiles.
+		// (Re)set looping variables
 		finishedLeftOrDown = false;
 		adjacentsLD = adjacentsRU = direction = -1;
 		totalTiles = 1;
@@ -243,7 +243,7 @@ bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 		
 		// Find all adjacent tiles and store them in the adjacentTiles array.
 		for (;;) {
-			// Get tile bit and relative offset when positive
+			// Get tile bit and relative tile offset
 			tileBit = 1ull << (relativeTile = NUMTILE_HEIGHT + (relativeOffset += bitShifter * direction));
 			
 			// Do not go out of bounds; break out of the loop after searching in all directions.
@@ -314,15 +314,16 @@ bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 		}
 		
 		Label_endTilesLoop:
-		// Miniumum number of adjacent tiles is 3.
+		// Miniumum number of adjacent tiles is 3 since this is smallest quantity of tiles that can add to seven.
 		if (totalTiles >= 3) {
 			// Copy found adjacent tiles from both directions into the adjacentTiles array in left to right fashion.
 			for (currentAdjacent = 0; adjacentsLD >= 0; ++currentAdjacent) {
 				adjacentTiles[currentAdjacent] = adjacentLeftDown[adjacentsLD--];
 			}
-			for (adjacentTiles[currentAdjacent++] = NUMTILE_DIGIT; adjacentsRU >= 0; ++currentAdjacent) {
-				adjacentTiles[currentAdjacent] = adjacentRightUp[adjacentsRU--];
+			for (adjacentTiles[currentAdjacent++] = NUMTILE_DIGIT, adjacentsRU = 0; currentAdjacent < totalTiles; ++currentAdjacent) {
+				adjacentTiles[currentAdjacent] = adjacentRightUp[adjacentsRU++];
 			}
+			
 			// Remaining adjacent tiles are set to zeros as they were not found during the search.
 			while (currentAdjacent < MAKESEVEN_SIZE) {
 				adjacentTiles[currentAdjacent++] = 0;
@@ -340,19 +341,21 @@ bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 			// 7. 2+1+1+1+1+1 = 7
 			// 8. 1+1+1+1+1+1+1 = 7
 			//
-			// Addition is commutative, so they can be in any order: 3+3+1 = 3+1+3 = 1+3+3 = 7
+			// Addition is commutative, so they can be in any order: 3+3+1 = 3+1+3 = 1+3+3 = 7.
+			// Partial sums are allowed as long they are in sequence: 3+3+1+2 is a winner, but 3+3+2+1 is not!
 			// This would have been in a loop but is unrolled to maximize performance and skip unnecessary checks.
+			// The sums are calculated then stored to avoid redundant additions that appear more than once.
 			//
 			// 3 adjacent tiles
 			// 3+3+1 3+2+2
 			// [1][2][3][4]: All matching tiles equal target sum: [3+3+1], [2+2+3]
 			//  ^  ^  ^
-			if ((adjacentTiles[0] + adjacentTiles[1] + adjacentTiles[2]) == 7) {
+			if ((sum012 = adjacentTiles[0] + (sum12 = adjacentTiles[1] + (sum2 = adjacentTiles[2]))) == 7) {
 				return true;
 			}
 			// [1][2][3][4]: One non-matching tile: 2+[3+3+1], 1+[2+2+3], 2+[2+2+3]
 			//     ^  ^  ^
-			if ((adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3]) == 7) { 
+			if ((sum123 = sum12 + (sum3 = adjacentTiles[3])) == 7) { 
 				return true;
 			}
 			
@@ -360,22 +363,22 @@ bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 			// 3+2+1+1 2+2+2+1
 			// [1][2][3][4][5][6][7]: [2+2+2+1]
 			//  ^  ^  ^  ^
-			if ((adjacentTiles[0] + adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3]) == 7) {
+			if ((sum012 + sum3) == 7) {
 				return true;
 			}
 			// [1][2][3][4][5][6][7]: 2+[2+2+2+1]
 			//     ^  ^  ^  ^
-			if ((adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4]) == 7) {
+			if ((sum123 + (sum4 = adjacentTiles[4])) == 7) {
 				return true;
 			}
-			// [1][2][3][4][5][6][7]: 2+2+[2+2+2+1]
+			// [1][2][3][4][5][6][7]: 2+2+[2+2+2+1], 3+1+[2+2+2+1]
 			//        ^  ^  ^  ^
-			if ((adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4] + adjacentTiles[5]) == 7) {
+			if ((sum2 + (sum345 = (sum34 = sum3 + sum4) + adjacentTiles[5])) == 7) {
 				return true;
 			}
 			// [1][2][3][4][5][6][7]: 2+2+2+[2+2+2+1]
 			//           ^  ^  ^  ^
-			if ((adjacentTiles[3] + adjacentTiles[4] + adjacentTiles[5] + adjacentTiles[6]) == 7) {
+			if ((sum345 + (sum6 = adjacentTiles[6])) == 7) {
 				return true;
 			}
 			
@@ -383,12 +386,12 @@ bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 			// 3+1+1+1+1; 2+2+1+1+1
 			// [1][2][3][4][5][6]: [3+1+1+1+1], [2+2+1+1+1]
 			//  ^  ^  ^  ^  ^
-			if ((adjacentTiles[0] + adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4]) == 7) {
+			if ((sum012 + sum34) == 7) {
 				return true;
 			}
 			// [1][2][3][4][5][6]: 1+[2+1+1+1+2], 1+[1+2+1+1+2], 1+[1+1+2+1+2], 1+[1+1+1+2+2]
 			//     ^  ^  ^  ^  ^
-			if ((adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4] + adjacentTiles[5]) == 7) {
+			if ((sum12 + sum345) == 7) {
 				return true;
 			}
 			
@@ -396,19 +399,19 @@ bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 			// 2+1+1+1+1+1
 			// [1][2][3][4][5][6][7]: [2+1+1+1+1+1]
 			//  ^  ^  ^  ^  ^  ^
-			if ((adjacentTiles[0] + adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4] + adjacentTiles[5]) == 7) {
+			if ((sum012 + sum345) == 7) {
 				return true;
 			}
 			// [1][2][3][4][5][6][7]: 1+[1+1+1+1+1+2]
 			//     ^  ^  ^  ^  ^  ^
-			if ((adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4] + adjacentTiles[5] + adjacentTiles[6]) == 7) {
+			if ((sum12 + (sum3456 = sum345 + sum6)) == 7) {
 				return true;
 			}
 			
 			// 7 adjacent tiles
 			// [1][2][3][4][5][6][7]: [1+1+1+1+1+1+1]
 			//  ^  ^  ^  ^  ^  ^  ^
-			if ((adjacentTiles[0] + adjacentTiles[1] + adjacentTiles[2] + adjacentTiles[3] + adjacentTiles[4] + adjacentTiles[5] + adjacentTiles[6]) == 7) {
+			if ((sum012 + sum3456) == 7) {
 				return true;
 			}
 		}
@@ -427,13 +430,12 @@ bool MakeSeven_gameOver(const MakeSeven *ms) {
 }
 
 bool MakeSeven_hasNoMoreMoves(const MakeSeven *ms) {
-	int t;
-	uint8_t remaining[3];
-
-	// Get the number of remaining tiles for that player
-	for (t = 0; t < 3; ++t) {
-		remaining[t] = (ms->plyNumber & 1u) ? (ms->remainingTiles[t] >> 4) : (ms->remainingTiles[t] & 0xf);
-	}
+	uint8_t remaining[3], TURN = ms->plyNumber & 1;
+	
+	// Get the number of remaining tiles for that player; loop is unrolled.
+	remaining[0] = TURN ? (ms->remainingTiles[0] >> 4) : (ms->remainingTiles[0] & 0xf);
+	remaining[1] = TURN ? (ms->remainingTiles[1] >> 4) : (ms->remainingTiles[1] & 0xf);
+	remaining[2] = TURN ? (ms->remainingTiles[2] >> 4) : (ms->remainingTiles[2] & 0xf);
 
 	// Does the current player has 1 and 2 tiles left?
 	// Yes: Play it through until the latter condition from below is met.
@@ -443,9 +445,9 @@ bool MakeSeven_hasNoMoreMoves(const MakeSeven *ms) {
 
 bool MakeSeven_drop(MakeSeven *ms, const int NUM_TILE, const int COLUMN) {
 	// Turn on a single bit that drops a number tile to that column.
-	uint64_t droppedTile = 1ull << ms->height[COLUMN];
+	uint64_t droppedTile = (uint64_t)(1ul) << ms->height[COLUMN];
 	int NUM_TILE_M1 = NUM_TILE - 1, NUM_TILE_M2 = NUM_TILE - 2;
-	uint8_t turn = ms->plyNumber & 1u, tileAmount = turn ? (ms->remainingTiles[NUM_TILE_M1] >> 4) : (ms->remainingTiles[NUM_TILE_M1] & 0xf);
+	uint8_t TURN = ms->plyNumber & 1, tileAmount = TURN ? (ms->remainingTiles[NUM_TILE_M1] >> 4) : (ms->remainingTiles[NUM_TILE_M1] & 0xf);
 
 	// Is the column not full of tiles, and does the player have any tiles left?
 	if (!(droppedTile & MAKESEVEN_TOP) && tileAmount) {
@@ -458,7 +460,7 @@ bool MakeSeven_drop(MakeSeven *ms, const int NUM_TILE, const int COLUMN) {
 		}
 
 		// This drop is legal. Now bitwise-or it with the bitmap of that player's dropped tiles.
-		ms->playerTiles[turn] |= droppedTile;
+		ms->playerTiles[TURN] |= droppedTile;
 		
 		// The MakeSeven structure does not have any means of saving one tiles in memory; check if this tile is not a 1 and bitwise-or to the two-and-three tiles variable.
 		// If no bit in twoAndThreeTiles are flipped on and there is a bit in playerTiles at the same spot, then it is guaranteed to be a 1 tile.
@@ -471,7 +473,7 @@ bool MakeSeven_drop(MakeSeven *ms, const int NUM_TILE, const int COLUMN) {
 		// Increase the column height where the tile was dropped in.
 		++ms->height[COLUMN];
 		// Deduct that number's remaining tiles from the given player.
-		ms->remainingTiles[NUM_TILE_M1] = (turn ? (ms->remainingTiles[NUM_TILE_M1] & 0xf) : (ms->remainingTiles[NUM_TILE_M1] & 0xf0)) | (--tileAmount << (turn << 2));
+		ms->remainingTiles[NUM_TILE_M1] = (TURN ? (ms->remainingTiles[NUM_TILE_M1] & 0xf) : (ms->remainingTiles[NUM_TILE_M1] & 0xf0)) | (--tileAmount << (TURN << 2));
 
 		// Sucessful drop.
 		return true;
@@ -483,7 +485,7 @@ bool MakeSeven_drop(MakeSeven *ms, const int NUM_TILE, const int COLUMN) {
 
 void MakeSeven_undrop(MakeSeven *ms) {
 	// Retrieve the last move from the movesHistory array and also retrieve that tile
-	uint8_t lastDroppedHeight = ms->movesHistory[--ms->plyNumber] & 0xf, turn = ms->plyNumber & 1u, lastNumberTile, numberTileM1, tileAmount;
+	uint8_t lastDroppedHeight = ms->movesHistory[--ms->plyNumber] & 0xf, turn = ms->plyNumber & 1, lastNumberTile, numberTileM1, tileAmount;
 	numberTileM1 = (lastNumberTile = (ms->movesHistory[ms->plyNumber] >> 4) - 1) - 1;
 	ms->playerTiles[turn] ^= 1ull << --ms->height[lastDroppedHeight];
 

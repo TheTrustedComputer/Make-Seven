@@ -32,15 +32,11 @@ int AlphaBeta_negamax(MakeSeven *ms, int depth, int alpha, int beta) {
 	}
 	// Check for a "Make 7"
 	if (AlphaBeta_checkForSeven(ms)) {
-		return AB_WIN;
+		return AB_WIN; // Current player wins
 	}
-	// Check if the player cannot make any more moves
-	if (MakeSeven_hasNoMoreMoves(ms)) {
-		return AB_DRAW;
-	}
-	// Check if hit maxiumum depth
-	if (!depth) {
-		return AB_UNKNOWN;
+	// Check if the player cannot make any more moves or hiting maxiumum depth
+	if (!depth || MakeSeven_hasNoMoreMoves(ms)) {
+		return AB_DRAW; // Assume draw
 	}
 	parentScore = alpha;
 	for (i = 4; --i;) {
@@ -92,11 +88,8 @@ int AlphaBeta_negamax_withMoveScores(MakeSeven *ms, int currDepth, int maxDepth,
 	if (AlphaBeta_checkForSeven(ms)) {
 		return AB_WIN;
 	}
-	if (MakeSeven_hasNoMoreMoves(ms)) {
+	if ((currDepth >= maxDepth) || MakeSeven_hasNoMoreMoves(ms)) {
 		return AB_DRAW;
-	}
-	if (currDepth >= maxDepth) {
-		return AB_UNKNOWN;
 	}
 	parentScore = alpha;
 	for (i = 4; --i;) {
