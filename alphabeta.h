@@ -38,6 +38,6 @@ void AlphaBeta_getMoveScores(MakeSeven*, Result*, Result*, Result*, Result*);
 void Result_print(Result*, Result*);
 void Result_increment(Result*);
 Result Result_getBestResult(Result*, Result*, Result*);
-short Result_getBestMove(Result*, Result*, Result*);
+uint8_t Result_getBestMove(Result*, Result*, Result*);
 
 #endif

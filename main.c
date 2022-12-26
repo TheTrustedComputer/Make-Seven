@@ -11,9 +11,14 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <pthread.h> // MinGW does not have the C11 threads.h header
-#elif __linux__
-#include <sys/sysinfo.h>
+#elif defined(__unix__)
+#include <unistd.h>
 #include <threads.h>
+#endif
+
+#ifdef __linux__
+#include <sys/sysinfo.h>
+#include <sys/resource.h>
 #endif
 
 #include "makeseven.c"
@@ -40,6 +45,16 @@ int main(int argc, char **argv) {
 	// Flag to stop running the solver
 	int stopRunning;
 	
+	// Lower the process priority for other processes
+#ifdef _WIN32
+	SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
+#elif defined(__linux__)
+	setpriority(getpid(), PRIO_PROCESS, 10);
+#endif
+	
+#ifdef FIXED_TT_SIZE // Tell the compiler to use a fixed size for the transposition table
+	TranspositionTable_initialize(&table, TT_HASHSIZE);
+#else
 #ifdef __linux__ // Linux: get host memory size using sysinfo; set transposition table size to half of host memory
 	{
 		// Structure for system information
@@ -79,7 +94,7 @@ int main(int argc, char **argv) {
 		// A non-zero return value means it's okay; if cannot fetch installed memory size
 		success1 = GlobalMemoryStatusEx(&memory);
 		// Divide by 1024^3 to get gigabytes as it is in bytes
-		gigs = memory.ullTotalPhys / (1024 * 1024 * 1024);
+		gigs = memory.ullTotalPhys / 1073741824;
 		for (power2 = 1; power2 < gigs; power2 <<= 1);
 		
 		if (success0) { // If either succeeded, initialize transposition table with half of host memory
@@ -96,6 +111,7 @@ int main(int argc, char **argv) {
 	// Default to one gigabyte on all other platforms
 	TranspositionTable_initialize(&table, TT_HASHSIZE);
 #endif
+#endif
 	
 	// Prepare game and alpha-beta move ordering array
 	AlphaBeta_getColumnMoveOrder();
@@ -107,31 +123,28 @@ int main(int argc, char **argv) {
 	
 	// Main solving loop
 	for (stopRunning = 0; !stopRunning;) {
-		if (argc >= 2) {
-			// Get move sequence from command line arguments
+		if (argc >= 2) { // Get move sequence from command line arguments
 			MakeSeven_sequence(&ms, argv[1]);
-			++stopRunning;
+			stopRunning = 1;
 			if (MakeSeven_tilesSumToSeven(&ms)) {
 				MakeSeven_print(&ms);
-				printf("%s wins!\n", ms.plyNumber & 1u ? MAKESEVEN_PLAYER1_NAME : MAKESEVEN_PLAYER2_NAME);
+				printf("\e[1m%s wins!\e[0m\n", ms.plyNumber & 1u ? MAKESEVEN_PLAYER1_NAME : MAKESEVEN_PLAYER2_NAME);
 				break;
 			}
 		}
 		else {
-			while ((input = getchar()) != EOF) {
+			while ((input = getchar()) != EOF) { // Get sequence from user input
 				if (MakeSeven_tilesSumToSeven(&ms)) {
-					printf("Game over. %s has made seven!\n", ms.plyNumber & 1u ? MAKESEVEN_PLAYER1_NAME : MAKESEVEN_PLAYER2_NAME);
-					while (input != '\n') {
-						input = getchar();
-					}
-					break;
+					MakeSeven_print(&ms);
+					printf("\e[1mGame over. %s made seven!\e[0m\n", ms.plyNumber & 1u ? MAKESEVEN_PLAYER1_NAME : MAKESEVEN_PLAYER2_NAME);
+					MakeSeven_initialize(&ms);
+					continue;
 				}
 				if (MakeSeven_hasNoMoreMoves(&ms)) {
-					printf("%s has no more number tiles remaining. Draw!\n", ms.plyNumber & 1u ? MAKESEVEN_PLAYER2_NAME : MAKESEVEN_PLAYER1_NAME);
-					while (input != '\n') {
-						input = getchar();
-					}
-					break;
+					MakeSeven_print(&ms);
+					printf("\e[1m%s has no more number tiles remaining. Draw!\e[0m\n", ms.plyNumber & 1u ? MAKESEVEN_PLAYER2_NAME : MAKESEVEN_PLAYER1_NAME);
+					MakeSeven_initialize(&ms);
+					continue;
 				}
 				if (!MakeSeven_getUserCharInput(&ms, input)) {
 					if (input == '\n') {
@@ -169,7 +182,7 @@ int main(int argc, char **argv) {
 		if (argc < 2) {
 			AlphaBeta_getMoveScores(&ms, r1, r2, r3, &r);
 			best = Result_getBestMove(r1, r2, r3);
-			printf("\aBest: %d\n", best);
+			printf("\aBest: %d%c\n", (best >> 4), (best & 0b1111) + 'A');
 			MakeSeven_initialize(&ms);
 			TranspositionTable_reset(&table);
 		}

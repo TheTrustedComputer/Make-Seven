@@ -1,7 +1,7 @@
 /*
 	Copyright (C) 2020 TheTrustedComputer
 
-	This is a computer implementation of Pressman Toy's Make Seven, a Connect Four-like game involving elementary additon.
+	This is a computer implementation of Make Seven, a Connect Four-like game involving elementary additon.
 	The objective of this game is to drop numbers that add up to seven in a vertical, horizontal, or diagonal matter.
 
 	Make Seven ships 11 one tiles, 11 two tiles, and 4 three tiles per player, totaling 52 tiles.

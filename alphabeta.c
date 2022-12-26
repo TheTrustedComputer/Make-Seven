@@ -24,10 +24,10 @@ bool AlphaBeta_checkForSeven(MakeSeven *ms) {
 }
 
 int AlphaBeta_negamax(MakeSeven *ms, int depth, int alpha, int beta) {
-	int parentScore, childScore, i, j;
+	int rootScore, leafScore, i, j;
 	++nodes;
 	// See if the score is in the transposition table
-	if (abs((tableScore = TranspositionTable_load(&table, (hash = MakeSeven_hashEncode(ms)), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1]))) >= AB_WIN) {
+	if (abs((tableScore = TranspositionTable_load(&table, MakeSeven_hashEncode(ms), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1]))) >= AB_WIN) {
 		return tableScore;
 	}
 	// Check for a "Make 7"
@@ -38,18 +38,18 @@ int AlphaBeta_negamax(MakeSeven *ms, int depth, int alpha, int beta) {
 	if (!depth || MakeSeven_hasNoMoreMoves(ms)) {
 		return AB_DRAW; // Assume draw
 	}
-	parentScore = alpha;
+	rootScore = alpha;
 	for (i = 4; --i;) {
 		for (j = 0; j < 7; ++j) {
 			if (MakeSeven_drop(ms, i, moveOrder[j])) {
 				// Drop tiles and see if our score beats the current best score
-				if ((childScore = -AlphaBeta_negamax(ms, depth - 1, -beta, -alpha)) > parentScore) {
-					parentScore = childScore;
+				if ((leafScore = -AlphaBeta_negamax(ms, depth - 1, -beta, -alpha)) > rootScore) {
+					rootScore = leafScore;
 				}
 				MakeSeven_undrop(ms);
 				// Update best score if it's better than the current best, and store that score
-				if (alpha < parentScore) {
-					TranspositionTable_store(&table, (hash = MakeSeven_hashEncode(ms)), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1], (alpha = parentScore));
+				if (alpha < rootScore) {
+					TranspositionTable_store(&table, MakeSeven_hashEncode(ms), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1], (alpha = rootScore));
 				}
 				// Alpha cut-off
 				if (alpha >= beta) {
@@ -58,15 +58,16 @@ int AlphaBeta_negamax(MakeSeven *ms, int depth, int alpha, int beta) {
 			}
 		}
 	}
-	// Store current score in the transposition table for later lookup
-	TranspositionTable_store(&table, (hash = MakeSeven_hashEncode(ms)), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1], alpha);
+	// Store current score for later lookup
+	TranspositionTable_store(&table, MakeSeven_hashEncode(ms), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1], alpha);
 	return alpha;
 }
 
+// The same as above but with move scores printed out
 int AlphaBeta_negamax_withMoveScores(MakeSeven *ms, int currDepth, int maxDepth, int alpha, int beta) {
 	int parentScore, childScore, i, j;
 	++nodes;
-	if ((tableScore = TranspositionTable_load(&table,(hash = MakeSeven_hashEncode(ms)), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1]))) {
+	if ((tableScore = TranspositionTable_load(&table, (hash = MakeSeven_hashEncode(ms)), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1]))) {
 		switch (TranspositionTable_loadBounds(&table, hash, ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1])) {
 		case TT_LOWERBOUND:
 			if (alpha < tableScore) {
@@ -101,7 +102,7 @@ int AlphaBeta_negamax_withMoveScores(MakeSeven *ms, int currDepth, int maxDepth,
 				}
 				MakeSeven_undrop(ms);
 				if (alpha < parentScore) {
-					TranspositionTable_storeBounds(&table, (hash = MakeSeven_hashEncode(ms)), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1], (alpha = parentScore), TT_LOWERBOUND);
+					TranspositionTable_storeBounds(&table, MakeSeven_hashEncode(ms), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1], (alpha = parentScore), TT_LOWERBOUND);
 				}
 				if (alpha >= beta) {
 					return alpha;
@@ -109,20 +110,22 @@ int AlphaBeta_negamax_withMoveScores(MakeSeven *ms, int currDepth, int maxDepth,
 			}
 		}
 	}
-	TranspositionTable_storeBounds(&table, (hash = MakeSeven_hashEncode(ms)), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1], alpha, TT_UPPERBOUND);
+	TranspositionTable_storeBounds(&table, MakeSeven_hashEncode(ms), ms->twoAndThreeTiles[0], ms->twoAndThreeTiles[1], alpha, TT_UPPERBOUND);
 	return alpha;
 }
 
 void AlphaBeta_getMoveScores(MakeSeven *ms, Result *r1, Result *r2, Result *r3, Result *best) {
 	int i, j;
 	if (r1 && r2 && r3) {
+		for (i = 0; i < 7; ++i) {
+			r1[i].wdl = r2[i].wdl = r3[i].wdl = UNKNOWN_CHAR;
+		}
 		for (i = 1; i <= 3; ++i) {
 			printf("%d ", i);
 			for (j = 0; j < 7; ++j) {
 #ifdef __unix__
 				fflush(stdout);
-#endif
-				r1[j].wdl = r2[j].wdl = r3[j].wdl = UNKNOWN_CHAR;
+#endif				
 				if (MakeSeven_drop(ms, i, j)) {
 					if (MakeSeven_tilesSumToSeven(ms)) {
 						switch (i) {
@@ -321,83 +324,82 @@ void Result_increment(Result *r) {
 }
 
 Result Result_getBestResult(Result *r1, Result *r2, Result *r3) {
-	unsigned i, j, score;
+	unsigned i, score;
 	Result best = { LOSS_CHAR, 0 };
+	
 	if (r1 && r2 && r3) {
-		for (i = score = 0; i < 3; ++i) {
-			for (j = 0; j < 7; ++j) {
-				switch (score) {
-				case 0:
-					switch (r1[i].wdl) {
-					case LOSS_CHAR:
-						if (best.dt7 < r1[i].dt7) {
-							best.dt7 = r1[i].dt7;
-						}
-						break;
-					case DRAW_CHAR:
-						best = r1[i];
-						score = 1;
-						break;
-					case WIN_CHAR:
-						best = r1[i];
-						score = 2;
-					}
-					switch (r2[i].wdl) {
-					case LOSS_CHAR:
-						if (best.dt7 < r2[i].dt7) {
-							best.dt7 = r2[i].dt7;
-						}
-						break;
-					case DRAW_CHAR:
-						best = r2[i];
-						score = 1;
-						break;
-					case WIN_CHAR:
-						best = r2[i];
-						score = 2;
-					}
-					switch (r3[i].wdl) {
-					case LOSS_CHAR:
-						if (best.dt7 < r3[i].dt7) {
-							best.dt7 = r3[i].dt7;
-						}
-						break;
-					case DRAW_CHAR:
-						best = r3[i];
-						score = 1;
-						break;
-					case WIN_CHAR:
-						best = r3[i];
-						score = 2;
-					}
-					break;
-				case 1:
-					switch (r1[i].wdl) {
-					case WIN_CHAR:
-						best = r1[i];
-						score = 2;
-					}
-					switch (r2[i].wdl) {
-					case WIN_CHAR:
-						best = r2[i];
-						score = 2;
-					}
-					switch (r3[i].wdl) {
-					case WIN_CHAR:
-						best = r3[i];
-						score = 2;
-					}
-					break;
-				case 2:
-					if (r1[i].wdl == WIN_CHAR && best.dt7 > r1[i].dt7) {
+		for (i = score = 0; i < 7; ++i) {
+			switch (score) {
+			case 0:
+				switch (r1[i].wdl) {
+				case LOSS_CHAR:
+					if (best.dt7 < r1[i].dt7) {
 						best.dt7 = r1[i].dt7;
 					}
-					else if (r2[i].wdl == WIN_CHAR && best.dt7 > r2[i].dt7) {
+					break;
+				case DRAW_CHAR:
+					best = r1[i];
+					score = 1;
+					break;
+				case WIN_CHAR:
+					best = r1[i];
+					score = 2;
+				}
+				switch (r2[i].wdl) {
+				case LOSS_CHAR:
+					if (best.dt7 < r2[i].dt7) {
 						best.dt7 = r2[i].dt7;
 					}
-					else if (r3[i].wdl == WIN_CHAR && best.dt7 > r3[i].dt7) {
+					break;
+				case DRAW_CHAR:
+					best = r2[i];
+					score = 1;
+					break;
+				case WIN_CHAR:
+					best = r2[i];
+					score = 2;
+				}
+				switch (r3[i].wdl) {
+				case LOSS_CHAR:
+					if (best.dt7 < r3[i].dt7) {
 						best.dt7 = r3[i].dt7;
 					}
+					break;
+				case DRAW_CHAR:
+					best = r3[i];
+					score = 1;
+					break;
+				case WIN_CHAR:
+					best = r3[i];
+					score = 2;
+				}
+				break;
+			case 1:
+				switch (r1[i].wdl) {
+				case WIN_CHAR:
+					best = r1[i];
+					score = 2;
+				}
+				switch (r2[i].wdl) {
+				case WIN_CHAR:
+					best = r2[i];
+					score = 2;
+				}
+				switch (r3[i].wdl) {
+				case WIN_CHAR:
+					best = r3[i];
+					score = 2;
+				}
+				break;
+			case 2:
+				if (r1[i].wdl == WIN_CHAR && best.dt7 > r1[i].dt7) {
+					best.dt7 = r1[i].dt7;
+				}
+				else if (r2[i].wdl == WIN_CHAR && best.dt7 > r2[i].dt7) {
+					best.dt7 = r2[i].dt7;
+				}
+				else if (r3[i].wdl == WIN_CHAR && best.dt7 > r3[i].dt7) {
+					best.dt7 = r3[i].dt7;
 				}
 			}
 		}
@@ -406,17 +408,40 @@ Result Result_getBestResult(Result *r1, Result *r2, Result *r3) {
 }
 
 // 
-short Result_getBestMove(Result *r1, Result *r2, Result *r3) {
+uint8_t Result_getBestMove(Result *r1, Result *r2, Result *r3) {
 	if (r1 && r2 && r3) {
-		int i, j;
+		int i, j, bestIndex, randomBest;
+		uint8_t bestTile[21], bestColumn[21];
 		Result bestResult = Result_getBestResult(r1, r2, r3);
+		bestIndex = 0;
 		srand(time(NULL));
+		
 		for (i = 0; i < 3; ++i) {
 			for (j = 0; j < 7; ++j) {
-				// fixme:
+				switch (i) {
+				case 0:
+					if ((r1[j].wdl != UNKNOWN_CHAR) && (bestResult.dt7 == r1[j].dt7)) {
+						bestTile[bestIndex] = 1;
+						bestColumn[bestIndex++] = j;
+					}
+					break;
+				case 1:
+					if ((r2[j].wdl != UNKNOWN_CHAR) && (bestResult.dt7 == r2[j].dt7)) {
+						bestTile[bestIndex] = 2;
+						bestColumn[bestIndex++] = j;
+					}
+					break;
+				case 2:
+					if ((r3[j].wdl != UNKNOWN_CHAR) && (bestResult.dt7 == r3[j].dt7)) {
+						bestTile[bestIndex] = 3;
+						bestColumn[bestIndex++] = j;
+					}
+				}
 			}
-		}
-		return 1;
+		}	
+		
+		randomBest = rand() % bestIndex;
+		return (bestTile[randomBest] << 4) | (bestColumn[randomBest]);
 	}
 	return 0;
 }
