@@ -192,32 +192,22 @@ void MakeSeven_print(const MakeSeven *ms) {
 
 bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 	if (ms->plyNumber) { // TODO: Remove this if statement; it crashes on empty board without
-		uint64_t ALL_TWOTILES_BITMASK, ALL_THREETILES_BITMASK, PLAYER_TILES_BITMASK, PLAYER_ONETILES_BITMASK, PLAYER_TWOTILES_BITMASK, PLAYER_THREETILES_BITMASK, tileBit;
-		int currentAdjacent, adjacentsLD, adjacentsRU, totalTiles, adjacentLeftDown[MAKESEVEN_SIZE_M1], adjacentRightUp[MAKESEVEN_SIZE_M1], adjacentTiles[MAKESEVEN_SIZE_P1], windowSum, windowStart, windowEnd; //sum012, sum12, sum123, sum2, sum3, sum34, sum345, sum3456, sum4, sum6;
-		uint8_t MOVES_HISTORY, PLY_M1, NUMTILE_HEIGHT, NUMTILE_DIGIT, NUMTILE_COLUMN, TURN, shiftSwitcher, bitShifter;
-		int8_t MIN_VERT_BITSHIFT, MIN_MSLOPE_BITSHIFT, MAX_MSLOPE_BITSHIFT, MIN_PSLOPE_BITSHIFT, MAX_PSLOPE_BITSHIFT, direction, relativeTile, relativeOffset;
-		bool finishedLeftOrDown;
+		uint64_t ALL_TWOTILES_BITMASK, ALL_THREETILES_BITMASK, PLAYER_TILES_BITMASK, PLAYER_ONETILES_BITMASK, PLAYER_TWOTILES_BITMASK, PLAYER_THREETILES_BITMASK, CURRENT_ONES_BITMASK, CURRENT_TWOS_BITMASK, CURRENT_THREES_BITMASK, CURRENT_ALL_BITMASK, HORI_BOUND_BITMASK, tileBit;
+		uint8_t totalTiles, adjacentTiles[MAKESEVEN_SIZE], winSum, winStart, winEnd, MOVES_HISTORY, PLY_M1, NUMTILE_HEIGHT, TURN, shiftSwitcher, bitShifter;
 		
 		// Variables initialization
 		PLY_M1 = ms->plyNumber - 1;
 		TURN = PLY_M1 & 1;
 		MOVES_HISTORY = ms->movesHistory[PLY_M1];
 		NUMTILE_HEIGHT = ms->height[MOVES_HISTORY & 0xf] - 1;
-		NUMTILE_DIGIT = MOVES_HISTORY >> 4;
-		NUMTILE_COLUMN = NUMTILE_HEIGHT / MAKESEVEN_SIZE_P1;
 		ALL_TWOTILES_BITMASK = ms->twoAndThreeTiles[0];
 		ALL_THREETILES_BITMASK = ms->twoAndThreeTiles[1];
 		PLAYER_TILES_BITMASK = ms->playerTiles[TURN];
 		PLAYER_ONETILES_BITMASK = PLAYER_TILES_BITMASK ^ (PLAYER_TILES_BITMASK & (ALL_TWOTILES_BITMASK | ALL_THREETILES_BITMASK));
 		PLAYER_TWOTILES_BITMASK = PLAYER_TILES_BITMASK & ALL_TWOTILES_BITMASK;
 		PLAYER_THREETILES_BITMASK = PLAYER_TILES_BITMASK & ALL_THREETILES_BITMASK;
-		MIN_VERT_BITSHIFT = NUMTILE_COLUMN * MAKESEVEN_SIZE_P1;
-		MIN_MSLOPE_BITSHIFT = MIN_MSLOPE_BITSHIFT_TABLE[NUMTILE_HEIGHT];
-		MAX_MSLOPE_BITSHIFT = MAX_MSLOPE_BITSHIFT_TABLE[NUMTILE_HEIGHT];
-		MIN_PSLOPE_BITSHIFT = MIN_PSLOPE_BITSHIFT_TABLE[NUMTILE_HEIGHT];
-		MAX_PSLOPE_BITSHIFT = MAX_PSLOPE_BITSHIFT_TABLE[NUMTILE_HEIGHT];
+		HORI_BOUND_BITMASK = MAKESEVEN_BOT << (NUMTILE_HEIGHT % MAKESEVEN_SIZE_P1);
 		shiftSwitcher = 0;
-		adjacentTiles[0] = NUMTILE_DIGIT;
 		
 		Label_nextDirectionShifter:
 		// Test all four directions.
@@ -236,91 +226,64 @@ bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 		}
 		
 		// (Re)set looping variables
-		finishedLeftOrDown = false;
-		adjacentsLD = adjacentsRU = direction = -1;
-		totalTiles = 1;
-		relativeOffset = 0;
+		totalTiles = 0;
+		tileBit = 1ull << NUMTILE_HEIGHT;
 		
-		// Find all adjacent tiles and store them in the adjacentTiles array.
-		for (;;) {
-			// Get tile bit and relative tile offset
-			tileBit = 1ull << (relativeTile = NUMTILE_HEIGHT + (relativeOffset += bitShifter * direction));
-			
-			// Do not go out of bounds; break out of the loop after searching in all directions.
-			switch (bitShifter) {
-			case 1:
-				// The last dropped tile is always on top of another and nothing is above it; therefore, there is no need to check tiles above it.
-				if (finishedLeftOrDown || (relativeTile < MIN_VERT_BITSHIFT)) {
-					goto Label_endTilesLoop;
-				}
-				goto Label_tilesSumToSeven;
-			case MAKESEVEN_SIZE_P1:
-				if (relativeTile < 0) { // Min horizontal shift
-					break;
-				}
-				if (relativeTile > 54) { // Max horizontal shift
-					goto Label_endTilesLoop;
-				}
-				goto Label_tilesSumToSeven;
-			case MAKESEVEN_SIZE:
-				// Computing maximum and minimum diagonal shift bounds takes O(n) time with O(1) space, where n is the number of cells in that direction.
-				// Using a precomputed table allowed a 25% decrease in solving time that takes O(1) time but with O(n) space.
-				if (relativeTile < MIN_MSLOPE_BITSHIFT) {
-					break;
-				}
-				if (relativeTile > MAX_MSLOPE_BITSHIFT) {
-					goto Label_endTilesLoop;
-				}
-				goto Label_tilesSumToSeven;
-			case MAKESEVEN_SIZE_P2:
-				if (relativeTile < MIN_PSLOPE_BITSHIFT) {
-					break;
-				}
-				if (relativeTile > MAX_PSLOPE_BITSHIFT) {
-					goto Label_endTilesLoop;
-				}
-				goto Label_tilesSumToSeven;
-			}
-			
-			// Start going in the opposite direction.
-			Label_goRightOrUp:
-			finishedLeftOrDown = true;
-			direction += 2;
-			relativeOffset = 0;
-			continue;
-			
-			Label_tilesSumToSeven:
-			if (PLAYER_ONETILES_BITMASK & tileBit) { // Found one tiles
-				(direction == 1) ? (adjacentRightUp[++adjacentsRU] = 1) : (adjacentLeftDown[++adjacentsLD] = 1);
-				++totalTiles;
-			}	
-			else if (PLAYER_TWOTILES_BITMASK & tileBit) { // Found two tiles
-				(direction == 1) ? (adjacentRightUp[++adjacentsRU] = 2) : (adjacentLeftDown[++adjacentsLD] = 2);
-				++totalTiles;
-			}
-			else if (PLAYER_THREETILES_BITMASK & tileBit) { // Found three tiles
-				(direction == 1) ? (adjacentRightUp[++adjacentsRU] = 3) : (adjacentLeftDown[++adjacentsLD] = 3);
-				++totalTiles;
-			}
-			else { // Found nothing or opponent tiles
-				if (direction == 1) {
-					break; // Finished going right or up; break out of the loop.
-				}
-				goto Label_goRightOrUp;
+		// Set bitmasks for potential wins per direction
+		switch (bitShifter) {
+		case 1:
+			CURRENT_ONES_BITMASK = PLAYER_ONETILES_BITMASK & VERT_BITMASK_TABLE[NUMTILE_HEIGHT];
+			CURRENT_TWOS_BITMASK = PLAYER_TWOTILES_BITMASK & VERT_BITMASK_TABLE[NUMTILE_HEIGHT];
+			CURRENT_THREES_BITMASK = PLAYER_THREETILES_BITMASK & VERT_BITMASK_TABLE[NUMTILE_HEIGHT];
+			CURRENT_ALL_BITMASK = PLAYER_TILES_BITMASK & VERT_BITMASK_TABLE[NUMTILE_HEIGHT];	
+			break;
+		case MAKESEVEN_SIZE_P1:
+			CURRENT_ONES_BITMASK = PLAYER_ONETILES_BITMASK & HORI_BOUND_BITMASK;
+			CURRENT_TWOS_BITMASK = PLAYER_TWOTILES_BITMASK & HORI_BOUND_BITMASK;
+			CURRENT_THREES_BITMASK = PLAYER_THREETILES_BITMASK & HORI_BOUND_BITMASK;
+			CURRENT_ALL_BITMASK = PLAYER_TILES_BITMASK & HORI_BOUND_BITMASK;
+			break;
+		case MAKESEVEN_SIZE:
+			CURRENT_ONES_BITMASK = PLAYER_ONETILES_BITMASK & NDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+			CURRENT_TWOS_BITMASK = PLAYER_TWOTILES_BITMASK & NDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+			CURRENT_THREES_BITMASK = PLAYER_THREETILES_BITMASK & NDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+			CURRENT_ALL_BITMASK = PLAYER_TILES_BITMASK & NDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+			break;
+		case MAKESEVEN_SIZE_P2:
+			CURRENT_ONES_BITMASK = PLAYER_ONETILES_BITMASK & PDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+			CURRENT_TWOS_BITMASK = PLAYER_TWOTILES_BITMASK & PDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+			CURRENT_THREES_BITMASK = PLAYER_THREETILES_BITMASK & PDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+			CURRENT_ALL_BITMASK = PLAYER_TILES_BITMASK & PDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+		}
+		
+		// Move tileBit to the leftmost tile before hitting an empty tile
+		if (bitShifter != 1) {
+			while (CURRENT_ALL_BITMASK & (tileBit >> bitShifter)) {
+				tileBit >>= bitShifter;
 			}
 		}
 		
-		Label_endTilesLoop:
-		// Miniumum number of adjacent tiles is 3 since this is smallest quantity of tiles that can add to seven.
-		if (totalTiles >= 3) {
-			// Copy found adjacent tiles from both directions into the adjacentTiles array in left to right fashion.
-			for (currentAdjacent = 0; adjacentsLD >= 0; ++currentAdjacent) {
-				adjacentTiles[currentAdjacent] = adjacentLeftDown[adjacentsLD--];
+		// Search tiles in this direction and store them in the adjacentTiles array
+		while (CURRENT_ALL_BITMASK) {
+			if (CURRENT_ONES_BITMASK & tileBit) {
+				adjacentTiles[totalTiles++] = 1; // Found one tiles
+			}	
+			else if (CURRENT_TWOS_BITMASK & tileBit) {
+				adjacentTiles[totalTiles++] = 2; // Found two tiles
 			}
-			for (adjacentTiles[currentAdjacent++] = NUMTILE_DIGIT, adjacentsRU = 0; currentAdjacent < totalTiles; ++currentAdjacent) {
-				adjacentTiles[currentAdjacent] = adjacentRightUp[adjacentsRU++];
+			else if (CURRENT_THREES_BITMASK & tileBit) {
+				adjacentTiles[totalTiles++] = 3; // Found three tiles
 			}
 			
+			// Shift toward zero to find the next tile.
+			CURRENT_ONES_BITMASK = (bitShifter == 1) ? (CURRENT_ONES_BITMASK << bitShifter) : (CURRENT_ONES_BITMASK >> bitShifter);
+			CURRENT_TWOS_BITMASK = (bitShifter == 1) ? (CURRENT_TWOS_BITMASK << bitShifter) : (CURRENT_TWOS_BITMASK >> bitShifter);
+			CURRENT_THREES_BITMASK = (bitShifter == 1) ? (CURRENT_THREES_BITMASK << bitShifter) : (CURRENT_THREES_BITMASK >> bitShifter);
+			CURRENT_ALL_BITMASK &= (bitShifter == 1) ? (CURRENT_ALL_BITMASK << bitShifter) : (CURRENT_ALL_BITMASK >> bitShifter);
+		}
+		
+		// Miniumum number of adjacent tiles is 3 since this is smallest quantity of tiles that can add to seven.
+		if (totalTiles >= 3) { 
 			// Sum all found adjacent tiles and see if they "Make 7".
 			// There are eight ways of adding to 7 given numbers 1, 2, and 3:
 			//
@@ -338,15 +301,22 @@ bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 			//
 			// Below is a variant of the sliding window algorithm with increasing window size when the window sum is greater than 7.
 			// Profiling showed this to be roughly 5% faster while exploring nearly the same number of positions than caching sums to variables.
-			for (windowSum = adjacentTiles[(adjacentTiles[currentAdjacent] = windowStart = windowEnd = 0)]; windowEnd < totalTiles;) {
-				if ((windowSum += adjacentTiles[++windowEnd]) == 7) {
-					return true;
+			for (winSum = adjacentTiles[0], winStart = winEnd = 0;;) {
+				if (winSum == 7) {
+					return true; // The current player wins.
 				}
-				if (windowSum > 7) {
-					windowSum -= adjacentTiles[windowStart++];
+				if (winSum > 7) {
+					winSum -= adjacentTiles[winStart++];
+				}
+				else if (++winEnd < totalTiles) {
+					winSum += adjacentTiles[winEnd];
+				}
+				else {
+					break; // The player to move does not have a "Make 7".
 				}
 			}
 		}
+			
 		// Switch directions and repeat.
 		if ((++shiftSwitcher) <= 3) {
 			goto Label_nextDirectionShifter;

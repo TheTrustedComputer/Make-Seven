@@ -41,9 +41,6 @@
 #define MAKESEVEN_BOT 0x1010101010101ull
 #define MAKESEVEN_TOP 0x80808080808080ull
 #define MAKESEVEN_LCL 0x7full
-#define MAKESEVEN_RCL 0x7f000000000000ull
-#define MAKESEVEN_DI1 0x40201008040201ull
-#define MAKESEVEN_DI2 0x1020408102040ull
 
 // In the physical game, the three tiles can only be dropped at the marked red squares; ones and twos can drop anywhere.
 #define MAKESEVEN_THREES 0x4102008201004ull
@@ -58,11 +55,32 @@ static int MakeSeven_userNumberTile, MakeSeven_inputReadyFlag;
 // Move variation to store the best move given the root position (Left four bits = Tile #; Right four bits = Column #)
 static uint8_t MakeSeven_variation[MAKESEVEN_AREA];
 
-// Maximum and minimum diagonal slope bitshift tables to always stay in bitboard bounds
-const int8_t MIN_MSLOPE_BITSHIFT_TABLE[55] = {0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 14, 0, 2, 3, 4, 5, 6, 14, 22, 0, 3, 4, 5, 6, 14, 22, 30, 0, 4, 5, 6, 14, 22, 30, 38, 0, 5, 6, 14, 22, 30, 38, 46, 0, 6, 14, 22, 30, 38, 46, 54};
-const int8_t MAX_MSLOPE_BITSHIFT_TABLE[55] = {0, 8, 16, 24, 32, 40, 48, 0, 8, 16, 24, 32, 40, 48, 49, 0, 16, 24, 32, 40, 48, 49, 50, 0, 24, 32, 40, 48, 49, 50, 51, 0, 32, 40, 48, 49, 50, 51, 52, 0, 40, 48, 49, 50, 51, 52, 53, 0, 48, 49, 50, 51, 52, 53, 54};
-const int8_t MIN_PSLOPE_BITSHIFT_TABLE[55] = {0, 1, 2, 3, 4, 5, 6, 0, 8, 0, 1, 2, 3, 4, 5, 0, 16, 8, 0, 1, 2, 3, 4, 0, 24, 16, 8, 0, 1, 2, 3, 0, 32, 24, 16, 8, 0, 1, 2, 0, 40, 32, 24, 16, 8, 0, 1, 0, 48, 40, 32, 24, 16, 8, 0};
-const int8_t MAX_PSLOPE_BITSHIFT_TABLE[55] = {54, 46, 38, 30, 22, 14, 6, 0, 53, 54, 46, 38, 30, 22, 14, 0, 52, 53, 54, 46, 38, 30, 22, 0, 51, 52, 53, 54, 46, 38, 30, 0, 50, 51, 52, 53, 54, 46, 38, 0, 49, 50, 51, 52, 53, 54, 46, 0, 48, 49, 50, 51, 52, 53, 54};
+// Vertical bitmask table to search for vertical connections below this tile, including itself
+const uint64_t VERT_BITMASK_TABLE[55] = {0x1ull, 0x3ull, 0x7ull, 0xfull, 0x1full, 0x3full, 0x7full, 0x0ull,
+										0x100ull, 0x300ull, 0x700ull, 0xf00ull, 0x1f00ull, 0x3f00ull, 0x7f00ull, 0x0ull,
+										0x10000ull, 0x30000ull, 0x70000ull, 0xf0000ull, 0x1f0000ull, 0x3f0000ull, 0x7f0000ull, 0x0ull,
+										0x1000000ull, 0x3000000ull, 0x7000000ull, 0xf000000ull, 0x1f000000ull, 0x3f000000ull, 0x7f000000ull, 0x0ull,
+										0x100000000ull, 0x300000000ull, 0x700000000ull, 0xf00000000ull, 0x1f00000000ull, 0x3f00000000ull, 0x7f00000000ull, 0x0ull,
+										0x10000000000ull, 0x30000000000ull, 0x70000000000ull, 0xf0000000000ull, 0x1f0000000000ull, 0x3f0000000000ull, 0x7f0000000000ull, 0x0ull,
+										0x1000000000000ull, 0x3000000000000ull, 0x7000000000000ull, 0xf000000000000ull, 0x1f000000000000ull, 0x3f000000000000ull, 0x7f000000000000ull};
+
+// Positive-slope diagonal bitmask table as above
+const uint64_t PDIAG_BITMASK_TABLE[55] = {0x40201008040201ull, 0x402010080402ull, 0x4020100804ull, 0x40201008ull, 0x402010ull, 0x4020ull, 0x40ull, 0x0ull,
+										  0x20100804020100ull, 0x40201008040201ull, 0x402010080402ull, 0x4020100804ull, 0x40201008ull, 0x402010ull, 0x4020ull, 0x0ull,
+										  0x10080402010000ull, 0x20100804020100ull, 0x40201008040201ull, 0x402010080402ull, 0x4020100804ull, 0x40201008ull, 0x402010ull, 0x0ull,
+										  0x8040201000000ull, 0x10080402010000ull, 0x20100804020100ull, 0x40201008040201ull, 0x402010080402ull, 0x4020100804ull, 0x40201008ull, 0x0ull,
+										  0x4020100000000ull, 0x8040201000000ull, 0x10080402010000ull, 0x20100804020100ull, 0x40201008040201ull, 0x402010080402ull, 0x4020100804ull, 0x0ull,
+										  0x2010000000000ull, 0x4020100000000ull, 0x8040201000000ull, 0x10080402010000ull, 0x20100804020100ull, 0x40201008040201ull, 0x402010080402ull, 0x0ull,
+										  0x1000000000000ull, 0x2010000000000ull, 0x4020100000000ull, 0x8040201000000ull, 0x10080402010000ull, 0x20100804020100ull, 0x40201008040201ull};
+
+// Negative-slope diagonals
+const uint64_t NDIAG_BITMASK_TABLE[55] = {0x1ull, 0x102ull, 0x10204ull, 0x1020408ull, 0x102040810ull, 0x10204081020ull, 0x1020408102040ull, 0x0ull,
+										 0x102ull, 0x10204ull, 0x1020408ull, 0x102040810ull, 0x10204081020ull, 0x1020408102040ull, 0x2040810204000ull, 0x0ull,
+										 0x10204ull, 0x1020408ull, 0x102040810ull, 0x10204081020ull, 0x1020408102040ull, 0x2040810204000ull, 0x4081020400000ull, 0x0ull,
+										 0x1020408ull, 0x102040810ull, 0x10204081020ull, 0x1020408102040ull, 0x2040810204000ull, 0x4081020400000ull, 0x8102040000000ull, 0x0ull,
+										 0x102040810ull, 0x10204081020ull, 0x1020408102040ull, 0x2040810204000ull, 0x4081020400000ull, 0x8102040000000ull, 0x10204000000000ull, 0x0ull,
+										 0x10204081020ull, 0x1020408102040ull, 0x2040810204000ull, 0x4081020400000ull, 0x8102040000000ull, 0x10204000000000ull, 0x20400000000000ull, 0x0ull,
+										 0x1020408102040ull, 0x2040810204000ull, 0x4081020400000ull, 0x8102040000000ull, 0x10204000000000ull, 0x20400000000000ull, 0x40000000000000ull};
 
 // The core Make Seven structure in which all movements and calculations are performed here.
 typedef struct {

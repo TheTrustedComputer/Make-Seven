@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
 #endif
 	
 #ifdef FIXED_TT_SIZE // Tell the compiler to use a fixed size for the transposition table
-	TranspositionTable_initialize(&table, TT_HASHSIZE);
+	TranspositionTable_initialize(&table, (finalTTSize = TT_HASHSIZE));
 #else
 #ifdef __linux__ // Linux: get host memory size using sysinfo; set transposition table size to half of host memory
 	{
@@ -63,16 +63,16 @@ int main(int argc, char **argv) {
 		
 		if (sysinfo(&sysSpecs) != -1) { // Request system information
 			// Fetch half of host memory size in gigabytes
-			gigs = sysSpecs.totalram / (1024 * 1024 * 1024) / 2;
+			gigs = sysSpecs.totalram / 2147483648ul;
 			// Round up to exactly a power of two
 			for (power2 = 1; power2 < gigs; power2 <<= 1);
 			// Keep asking for memory but use half of that memory if unable to get it reserved
-			while (!TranspositionTable_initialize(&table, TT_HASHSIZE * power2)) {
+			while (!TranspositionTable_initialize(&table, (finalTTSize = TT_HASHSIZE * power2))) {
 				power2 >>= 1;
 			}
 		}
-		else { // Use a gigabyte if cannot get system information
-			TranspositionTable_initialize(&table, TT_HASHSIZE);
+		else { // Use a fallback if cannot get system information
+			TranspositionTable_initialize(&table, (finalTTSize = TT_HASHSIZE));
 		}
 	}
 #elif defined(_WIN32) // Windows: get host memory size using GlobalMemoryStatusEx; this works with virtual machines unlike GetPhysicallyInstalledSystemMemory
@@ -98,18 +98,18 @@ int main(int argc, char **argv) {
 		for (power2 = 1; power2 < gigs; power2 <<= 1);
 		
 		if (success0) { // If either succeeded, initialize transposition table with half of host memory
-			for (upower2 >>= 1; !TranspositionTable_initialize(&table, TT_HASHSIZE * upower2); upower2 >>= 1);
+			for (upower2 >>= 1; !TranspositionTable_initialize(&table, (finalTTSize = TT_HASHSIZE * upower2)); upower2 >>= 1);
 		}
 		else if (success1) {
-			for (power2 >>= 1; !TranspositionTable_initialize(&table, TT_HASHSIZE * power2); power2 >>= 1);
+			for (power2 >>= 1; !TranspositionTable_initialize(&table, (finalTTSize = TT_HASHSIZE * power2)); power2 >>= 1);
 		}
 		else { // When neither of the above worked, use a gigabyte
-			TranspositionTable_initialize(&table, TT_HASHSIZE);
+			TranspositionTable_initialize(&table, (finalTTSize = TT_HASHSIZE));
 		}
 	}
 #else
 	// Default to one gigabyte on all other platforms
-	TranspositionTable_initialize(&table, TT_HASHSIZE);
+	TranspositionTable_initialize(&table, (finalTTSize = TT_HASHSIZE));
 #endif
 #endif
 	
@@ -156,6 +156,7 @@ int main(int argc, char **argv) {
 		
 		// Print game state
 		MakeSeven_print(&ms);
+		MakeSeven_tilesSumToSeven(&ms);
 		
 		// Time the search
 		nodes = 0ull;
@@ -184,7 +185,12 @@ int main(int argc, char **argv) {
 			best = Result_getBestMove(r1, r2, r3);
 			printf("\aBest: %d%c\n", (best >> 4), (best & 0b1111) + 'A');
 			MakeSeven_initialize(&ms);
+#ifdef __GNUC__
+			TranspositionTable_destroy(&table);
+			TranspositionTable_initialize(&table, finalTTSize);
+#else
 			TranspositionTable_reset(&table);
+#endif
 		}
 	}
 	TranspositionTable_destroy(&table);

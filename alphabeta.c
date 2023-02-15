@@ -145,7 +145,7 @@ void AlphaBeta_getMoveScores(MakeSeven *ms, Result *r1, Result *r2, Result *r3, 
 					else {
 #ifdef __GNUC__
 						TranspositionTable_destroy(&table);
-						TranspositionTable_initialize(&table, TT_HASHSIZE);
+						TranspositionTable_initialize(&table, finalTTSize);
 #else
 						TranspositionTable_reset(&table);
 #endif
