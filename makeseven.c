@@ -257,10 +257,8 @@ bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 		}
 		
 		// Move tileBit to the leftmost tile before hitting an empty tile
-		if (bitShifter != 1) {
-			while (CURRENT_ALL_BITMASK & (tileBit >> bitShifter)) {
-				tileBit >>= bitShifter;
-			}
+		while (CURRENT_ALL_BITMASK & (tileBit >> bitShifter)) {
+			tileBit >>= bitShifter;
 		}
 		
 		// Search tiles in this direction and store them in the adjacentTiles array
@@ -276,10 +274,10 @@ bool MakeSeven_tilesSumToSeven(const MakeSeven *ms) {
 			}
 			
 			// Shift toward zero to find the next tile.
-			CURRENT_ONES_BITMASK = (bitShifter == 1) ? (CURRENT_ONES_BITMASK << bitShifter) : (CURRENT_ONES_BITMASK >> bitShifter);
-			CURRENT_TWOS_BITMASK = (bitShifter == 1) ? (CURRENT_TWOS_BITMASK << bitShifter) : (CURRENT_TWOS_BITMASK >> bitShifter);
-			CURRENT_THREES_BITMASK = (bitShifter == 1) ? (CURRENT_THREES_BITMASK << bitShifter) : (CURRENT_THREES_BITMASK >> bitShifter);
-			CURRENT_ALL_BITMASK &= (bitShifter == 1) ? (CURRENT_ALL_BITMASK << bitShifter) : (CURRENT_ALL_BITMASK >> bitShifter);
+			CURRENT_ONES_BITMASK >>= bitShifter;
+			CURRENT_TWOS_BITMASK >>= bitShifter;
+			CURRENT_THREES_BITMASK >>= bitShifter;
+			CURRENT_ALL_BITMASK &= (CURRENT_ALL_BITMASK >> bitShifter);
 		}
 		
 		// Miniumum number of adjacent tiles is 3 since this is smallest quantity of tiles that can add to seven.
