@@ -35,7 +35,7 @@ Make Seven solver by TheTrustedComputer
 Hash table of 1073741789 entries
 ```
 
-The number of hash table entries may vary depending on the amount of physical memory installed. In this example, the program was run on a system with 32 gigabytes of memory. The number of hash table entries may vary depending on the amount of physical memory installed. In this diagram, the program was run on a system with 32 gigabytes of memory. It can be changed with a command-line switch ```-t <SIZE>``` , where \<SIZE> is the hash size in gigabytes.
+The number of hash table entries may vary depending on the amount of physical memory installed. In this diagram, the program was run on a system with 32 gigabytes of memory. It can be changed with a command-line switch ```-t <SIZE>``` , where \<SIZE> is the hash size in gigabytes.
 
 ## How to Use
 To be determined.
