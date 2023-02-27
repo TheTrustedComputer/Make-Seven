@@ -50,7 +50,9 @@ Hash table of 1073741789 entries
 The number of hash table entries may vary depending on the total physical memory installed. In this diagram, the program was run on a system with 32 gigabytes of memory. It can be changed with a command-line switch ```-t <SIZE>``` , where \<SIZE> is the hash size in gigabytes.
 
 ## How to Use
-To be determined.
+To use this program, two characters encode a move. The first character specifies the type of number tile, and the second represents the column index to be dropped, using letters as described in the diagram. For example, the input 2D2D1C2D will place three 2's in column D and a single 1 in column C. Two 2's belonging to the second player, called Yellow, will appear stacked on top of the first player's, called Green, as well as the 1 that is adjacent to it. The program alternates the colors of the letters to determine the current side to play. Below the grid is information about the remaining tiles for that side.
+
+After pressing the Enter key, the program will begin solving the current position. How it will end depends on the state of the game. If there are just a couple of tiles, it may take more than an hour to solve, or even several days, since it has a higher branching factor than Connect 4 and more complex winning logic. On the other hand, if there are many tiles, signifying the game is near its conclusion stage, solving time will be much shorter. The program will then present a solution that is formatted as follows.
 
 ## Bug Reports
 It usually works as intended, but there may be instances where it misbehaves. Please submit any bugs you find in depth on the issues page, but understand that there is no guarantee they will be fixed in a timely manner.
