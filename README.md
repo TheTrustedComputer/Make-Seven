@@ -26,7 +26,7 @@ The letters A through G indicate the column index, and hyphens and equal signs m
 7. 3+2+2
 8. 3+3+1
 
-Note that partial sums are also allowed, meaning that if a player has 3+3+1 lined up, 2+3+3+1 is considered a win. Conversely, 2+3+3+2 is not a win because there is no consecutive sequence that adds up to 7. Since addition is commutative, the sequence is interchangeable. When one player runs out of tiles to move before there is a winner, the game is declared a draw. More information about the game can be found at https://boardgamegeek.com/boardgame/6367/make-7.
+Note that partial sums are also allowed, meaning that if a player has 3+3+1 to line up, 2+3+3+1 is considered a win. Conversely, 2+3+3+2 is not a win because there is no consecutive sequence that adds up to 7. Since addition is commutative, the sequence is interchangeable. When one player runs out of tiles to move before there is a winner, the game is declared a draw. More information about the game can be found at https://boardgamegeek.com/boardgame/6367/make-7.
 
 ## Compilation Instructions
 Any C compiler will do, I recommend GCC as this is my main compiler for testing the program. To compile it, browse the directory where the sources reside and type the commands into a shell as shown below.
