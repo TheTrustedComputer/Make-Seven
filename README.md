@@ -50,6 +50,10 @@ To use this program, two characters encode a move. The first character specifies
 
 After pressing the Enter key, the program will begin solving the current position. How it will end depends on the state of the game. If there are just a couple of tiles, it may take more than an hour to solve, or even several days, since it has a higher branching factor than Connect 4 and more complex winning logic. On the other hand, if there are many tiles, signifying the game is near its conclusion stage, solving time will be much shorter. The program will then present a solution that is formatted as follows.
 
+```[Result] [Nodes] [Speed] [Time]```
+
+The result can be a win (W), loss (L), or draw (D), and to the right of it is the number of moves to reach that result, in plies or half-moves. Nodes refer to the final count of game tree nodes explored. Speed measures of how fast this position was solved per second. Time records the length of time spent solving.
+
 ## Bug Reports
 It usually works as intended, but there may be instances where it misbehaves. Please submit any bugs you find in depth on the issues page, but understand that there is no guarantee they will be fixed in a timely manner.
 
