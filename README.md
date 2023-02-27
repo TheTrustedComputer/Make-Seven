@@ -33,11 +33,7 @@ Any C compiler will do, I recommend GCC as this is my main compiler for testing 
 
 ```gcc -Ofast -s -march-native main.c -o MakeSeven```
 
-If your system has GNU Make installed, I have attached a makefile to simplify the building process for you. Enter "make" without quotes, and it will execute the same command as above.
-
-```make```
-
-It should not take long to compile. After it completes, run the program.
+If your system has GNU Make installed, I have attached a makefile to simplify the building process for you. Enter "make" without quotes, and it will execute the same command as above. It should not take long to compile. After it completes, run the program.
 
 ```./MakeSeven```
 
