@@ -15,7 +15,7 @@ Make 7 is a variant of Connect 4 produced by Pressman Toys. In this game, each p
 |  -  |  -  |  -  |  -  |  -  |  -  |  -  |
 |  -  |  -  |  -  |  -  |  -  |  -  |  -  |
 
-The letters A through G indicate the column index, and hyphens and equal signs mark unoccupied cells available for both 1's and 2's, and  3's, respectively. Furthermore, there are 8 possible ways to add 7, given the numbers 1, 2, and 3.
+The letters A through G indicate the column index, and hyphens and equal signs mark unoccupied cells available for both 1's and 2's, and  3's, respectively. Although not shown in the table, the 1's and 2's can go where the 3's go. There are 8 possible ways to add 7, given the numbers 1, 2, and 3.
 
 1. 1+1+1+1+1+1+1
 2. 2+1+1+1+1+1
