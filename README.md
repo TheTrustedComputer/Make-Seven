@@ -15,7 +15,7 @@ Make 7 is a variant of Connect 4 produced by Pressman Toys. In this game, each p
 |  -  |  -  |  -  |  -  |  -  |  -  |  -  |
 |  -  |  -  |  -  |  -  |  -  |  -  |  -  |
 
-The letters A through G indicate the column index, and hyphens and equal signs mark unoccupied cells available for both 1's and 2's, and  3's, respectively. Although not shown in the table, the 1's and 2's can go where the 3's go. There are 8 possible ways to add 7, given the numbers 1, 2, and 3.
+The letters A through G denote the column index, and hyphens and equal signs mark unoccupied cells available for both 1's and 2's, and  3's, respectively. Although not shown in the table, the 1's and 2's can go where the 3's go. There are 8 possible ways to add 7, given the numbers 1, 2, and 3.
 
 1. 1+1+1+1+1+1+1
 2. 2+1+1+1+1+1
@@ -29,7 +29,7 @@ The letters A through G indicate the column index, and hyphens and equal signs m
 Note that partial sums are also allowed, meaning that if a player has 3+3+1 to line up, 2+3+3+1 is considered a win. Conversely, 2+3+3+2 is not a win because there is no consecutive sequence that adds up to 7. Since addition is commutative, the sequence is interchangeable. When one player runs out of tiles to move before there is a winner, the game is declared a draw. More information about the game can be found at https://boardgamegeek.com/boardgame/6367/make-7.
 
 ## Compilation Instructions
-Any C compiler will do, I recommend GCC as this is my main compiler for testing the program. To compile it, browse the directory where the sources reside and type the commands into a shell as shown below.
+Any C compiler will do, I recommend GCC as this is my main compiler for testing the program. To compile it, browse the directory where the sources reside and type the commands into a shell as below.
 
 ```gcc -Ofast -s -march-native main.c -o MakeSeven```
 
