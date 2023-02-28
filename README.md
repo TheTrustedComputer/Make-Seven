@@ -53,7 +53,7 @@ After pressing the Enter key, the program will begin solving the current positio
 
 ```[Result] [Nodes] [Speed] [Time]```
 
-The result can be a win (W), loss (L), or draw (D), and to the right of it is the number of moves to reach that result, in plies or half-moves, from the player's perspective. Nodes refer to the final count of game tree nodes explored. Speed measures how fast this position was solved per second. Time records the length of time in seconds spent solving. The program will repeatedly prompt for input and solve until the user closes it.
+The result can be a win (W), loss (L), or draw (D), and to the right of it is the number of moves to reach that result, in plies or half-moves, from the player's perspective. Nodes refer to the final count of game tree nodes explored. Speed measures how fast this position was solved per second. Time records the length of time in seconds spent solving. The program will then solve all possible moves for the player and randomly print one of the best moves. However, it will not solve them when given arguments. Otherwise, it will repeatedly prompt for input and solve until the user closes it.
 
 ## Bug Reports
 It usually works as intended, but there may be instances where it misbehaves. Please submit any bugs you find in depth on the issues page, but understand that there is no guarantee they will be fixed in a timely manner.
