@@ -5,7 +5,6 @@ An alternative called Monte Carlo tree search can be used and played against. Ke
 
 I am open to pull requests. If you have any ideas or suggestions for improvement, please do so, and we will discuss them.
 
-
 ## What is Make 7?
 Make 7 is a variant of Connect 4 produced by Pressman Toys. In this game, each player receives eleven 1 and 2 tiles, and four 3 tiles on a 7 by 7 playing field. The rules are that the 1's and 2's can drop to any non-full column, while the 3's can only fall into spots as indicated by the red squares. The object is to align these tiles horizontally, vertically, or diagonally so that their sum is 7. Below is a table illustrating the empty grid.
 
