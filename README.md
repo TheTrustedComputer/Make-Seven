@@ -47,7 +47,7 @@ Make Seven solver by TheTrustedComputer
 Hash table of 1073741789 entries
 ```
 
-The number of hash table entries may vary depending on the total physical memory installed. In this diagram, the program was run on a system with 32 gigabytes of memory. It can be changed with a command-line switch ```-t <SIZE>``` , where \<SIZE> is the hash size in gigabytes.
+The number of hash table entries may vary depending on the total physical memory installed. In this diagram, the program was run on a system with 32 gigabytes of memory. It can be changed with a command-line switch ```-t <SIZE>``` , where ```<SIZE>``` is the hash size in gigabytes.
 
 ## How to Use
 To use this program, two characters encode a move. The first character specifies the type of number tile, and the second represents the column index to be dropped, using letters as described in the table. For example, the input ```2D2D1C2D``` will place three 2's in column D and a single 1 in column C. Two 2's belonging to the second player, called Yellow, will appear stacked on top of the first player's, called Green, as well as the 1 that is adjacent to it. The program alternates the colors of the letters to determine the current side to play. Below the grid is information about the remaining tiles for that side. Users may also enter moves directly from command line arguments, and they are case-insensitive.
