@@ -18,7 +18,7 @@ Make 7 is a variant of Connect 4 produced by Pressman Toys. In this game, each p
 |  -  |  -  |  -  |  -  |  -  |  -  |  -  |
 |  -  |  -  |  -  |  -  |  -  |  -  |  -  |
 
-The letters A through G denote the column index, and hyphens and equal signs mark unoccupied cells available for both 1's and 2's, and  3's, respectively. Although not shown in the table, the 1's and 2's can go where the 3's go. There are 8 possible ways to add 7, given the numbers 1, 2, and 3.
+The letters A through G denote the column index, and hyphens and equal signs mark unoccupied cells available for both 1's and 2's, and  3's, respectively. Although not shown in the table, the 1's and 2's can go where the 3's go. There are 8 unique possible ways to add 7, given the numbers 1, 2, and 3.
 
 1. 1+1+1+1+1+1+1
 2. 2+1+1+1+1+1
@@ -29,12 +29,12 @@ The letters A through G denote the column index, and hyphens and equal signs mar
 7. 3+2+2
 8. 3+3+1
 
-Note that partial sums are also allowed, meaning that if a player has 3+3+1 to line up, 2+3+3+1 is considered a win. Conversely, 2+3+3+2 is not a win because there is no consecutive sequence that adds up to 7. Since addition is commutative, the sequence is interchangeable. When one player runs out of tiles to move before there is a winner, the game is declared a draw. More information about the game can be found at https://boardgamegeek.com/boardgame/6367/make-7.
+Note that partial sums are also allowed, meaning that if a player has 3+3+1 to line up, 2+3+3+1 is considered a win. Conversely, 2+3+3+2 is not a win because there is no consecutive sequence that adds up to 7. Since addition is commutative, the sequence is interchangeable. Taking into account the commutative property, there are a total of 44 combinations. When one player runs out of tiles to move before there is a winner, the game is declared a draw. More information about the game can be found at https://boardgamegeek.com/boardgame/6367/make-7.
 
 ## Compilation Instructions
 Any C compiler will do, I recommend GCC as this is my main compiler for testing the program. To compile it, browse the directory where the sources reside and type the commands into a shell as below.
 
-```gcc -Ofast -s -march-native main.c -o MakeSeven```
+```gcc -Wall -Wextra -Ofast -s -lm -std=c2x -march=native -pthread main.c -o MakeSeven```
 
 If your system has GNU Make installed, I have attached a makefile to simplify the building process for you. Type ```make```, and it will execute the same command as above. It should not take long to compile. After it completes, run the program.
 
@@ -56,7 +56,7 @@ After pressing the Enter key, the program will begin solving the current positio
 
 ```[Result] [Nodes] [Speed] [Time]```
 
-The result can be a win (W), loss (L), or draw (D), and to the right of it is the number of moves to reach that result, in plies or half-moves, from the player's perspective. Nodes refer to the final count of game tree nodes explored. Speed measures how fast this position was solved per second. Time records the length of time in seconds spent solving. The program will then solve all possible moves for the player and randomly print one of the best moves. However, it will not solve them when given arguments. Otherwise, it will repeatedly prompt for input and solve until the user closes it.
+The result can be a win (W), loss (L), or draw (D), and to the right of it is the number of moves to reach that result, in plies or half-moves, from the player's perspective. Nodes refer to the final count of game tree nodes explored. Speed measures how fast this position was solved per second. Time records the length of time in seconds spent solving. The program will then solve all possible moves for the player and randomly print one of the best moves. However, it will not solve them when given move sequence arguments. Otherwise, it will repeatedly prompt for input and solve until the user closes it.
 
 ## Bug Reports
 It usually works as intended, but there may be instances where it misbehaves. Please submit any bugs you find in depth on the issues page, but understand that there is no guarantee they will be fixed in a timely manner.
