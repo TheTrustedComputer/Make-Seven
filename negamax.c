@@ -104,29 +104,36 @@ int Negamax_worker(void *_negamaxWorkArgs)
 {
     NegamaxThread *nt = _negamaxWorkArgs;
     
-    // Solve this assigned position
-    nt->result = Negamax_solve(&nt->ms, nt->table, nt->verbose);
-        
-    mtx_lock(nt->mutex);
-    Result_increment(&nt->result);
+    assert(nt->table);
+    assert(nt->table->tableEntry);
+    thrd_yield();
     
-    // Set the result for this move
-    nt->results[nt->move & 0xf] = nt->result;
+    mtx_lock(nt->startMtx);
+    
+    // Wait for the start barrier
+    while (atomic_load(nt->idle) && (atomic_load(nt->running) < *nt->count))
+    {
+        cnd_wait(nt->startCnd, nt->startMtx);
+    }
+    
+    mtx_unlock(nt->startMtx);
+    
+    // Solve this assigned position and set the result for this move
+    nt->result = Negamax_solve(&nt->ms, nt->table, nt->verbose);
+    Result_increment(&nt->result);
+    nt->results[nt->move & 0xf] = nt->result;  
+    mtx_lock(nt->finishMtx);
     
     // Let the main thread know that this thread has finished
-    if (cnd_signal(nt->cond) == thrd_success)
+    if (cnd_signal(nt->finishCnd) == thrd_success)
     {
         // Decrement the number of running threads and save this thread's ID
-        --(*nt->running);
-        *nt->finishID = nt->id;
-    }
-    else
-    {
-        fprintf(stderr, "Negamax worker thread #%d could not signal the main thread.\n", nt->id);
+        atomic_fetch_sub(nt->running, 1);
+        atomic_store(nt->finishID, nt->id);
     }
     
-    mtx_unlock(nt->mutex);
-    
+    mtx_unlock(nt->finishMtx);
+        
     return 0;
 }
 
@@ -156,14 +163,16 @@ Result Negamax_solve(MakeSeven *_ms, TranspositionTable *_tt, const bool _VERBOS
 
 Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1, Result *_r2, Result *_r3, Result *_bestResl, uint8_t *_bestMove)
 {
-    int t, tileN, colN, runners, finishID;
+    int t, tileN, colN, finished;
+    atomic_int runners, finishID;
     unsigned thrTableSize;
     uint8_t dropList[MAKESEVEN_SIZE_X3], dropCount, nextUnsolved;
     Result bestResl;
+    atomic_bool idle;
     
-    // Condition variables and mutexes for signaling the main thread
-    mtx_t thrMutex;
-    cnd_t thrCond;
+    // Condition variables and mutexes for signaling
+    mtx_t thrFinishMutex, thrStartMutex;
+    cnd_t thrFinishCondV, thrStartCondV;
     
     // Generate all possible moves in the given position
     MakeSeven_generate(_ms, dropList, &dropCount);
@@ -172,6 +181,7 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
     thrd_t thread[dropCount];
     NegamaxThread thrArgs[dropCount];
     bool winOnFirst[dropCount];
+    TranspositionTable thrTT[dropCount];
     
     // Perform lazy thread creation; one drop move per thread
 #if defined (_WIN64) || defined (_WIN32)
@@ -186,12 +196,10 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
     }
 #endif
     
-    // Seperate transposition tables for each thread
-    TranspositionTable thrTT[thrCount];
-    
-    if ((thrTableSize = TranspositionTable_prevprime(table.size / thrCount)) <= 3)
+    // Make it work with systems with low memory requirements
+    if ((thrTableSize = TranspositionTable_prevprime((table.size + 1) / thrCount)) < TT_HASHSIZE)
     {
-        thrTableSize = 3;
+        thrTableSize = TT_HASHSIZE;
     }
 
     // Initialize the results with unknown values
@@ -206,13 +214,18 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
         thrArgs[t] = (NegamaxThread)
         { 
             .ms = *_ms,
+            .count = &thrCount,
+            .id = t,
             .running = &runners,
             .finishID = &finishID,
-            .id = t,
-            .mutex = &thrMutex,
-            .cond = &thrCond,
+            .startMtx = &thrStartMutex,
+            .finishMtx = &thrFinishMutex,
+            .startCnd = &thrStartCondV,
+            .finishCnd = &thrFinishCondV,
+            .table = &thrTT[t % thrCount],
             .move = dropList[t],
-            .verbose = _VERBOSE
+            .verbose = _VERBOSE,
+            .idle = &idle
         };
         
         winOnFirst[t] = false;
@@ -240,20 +253,33 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
     }
     
     // Initialize the mutex and condition variable
-    if (mtx_init(&thrMutex, mtx_plain) != thrd_success)
+    if (mtx_init(&thrStartMutex, mtx_plain) != thrd_success)
     {
-        fprintf(stderr, "Could not initialize the mutex for the negamax threads.\n");
-        return RESULT_DRAW;
+        fprintf(stderr, "Could not initialize the mutex to start the negamax worker threads.\n");
+        exit(EXIT_FAILURE);
     }
     
-    if (cnd_init(&thrCond) != thrd_success)
+    if (mtx_init(&thrFinishMutex, mtx_plain) != thrd_success)
     {
-        fprintf(stderr, "Could not initialize the condition variable for the negamax threads.\n");
-        return RESULT_DRAW;
+        fprintf(stderr, "Could not initialize the mutex for the negamax worker threads.\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    if (cnd_init(&thrStartCondV) != thrd_success)
+    {
+        fprintf(stderr, "Could not initialize the condition variable to start the negamax worker threads.\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    if (cnd_init(&thrFinishCondV) != thrd_success)
+    {
+        fprintf(stderr, "Could not initialize the condition variable for the negamax worker threads.\n");
+        exit(EXIT_FAILURE);
     }
     
     nextUnsolved = thrCount;
-    runners = 0;
+    atomic_init(&runners, 0);
+    atomic_init(&idle, true);
     
     // Solve the position in parallel; each thread holds a copy of the game state to ensure no data races when making moves
     // However, the transposition table is unprotected, so threads may overwrite entries when one thread is still reading them
@@ -264,11 +290,7 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
         // Start the threads
         if (!winOnFirst[t])
         {
-            if (TranspositionTable_initialize(&thrTT[t], thrTableSize))
-            {
-                thrArgs[t].table = &thrTT[t];
-            }
-            else
+            if (!TranspositionTable_initialize(&thrTT[t], thrTableSize + 1))
             {
                 fprintf(stderr, "Could not initialize the transposition table for thread #%d.\n", t);
                 exit(EXIT_FAILURE);
@@ -283,45 +305,45 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
                 fprintf(stderr, "Could not allocate thread #%d.\n", t);
                 exit(EXIT_FAILURE);
             default:
-                ++runners;
+                atomic_fetch_add(&runners, 1);
                 break;
             }
         }
     }
     
+    // Signal all the threads to start solving their respective positions
+    mtx_lock(&thrStartMutex);
+    cnd_broadcast(&thrStartCondV);
+    mtx_unlock(&thrStartMutex);
+    atomic_store(&idle, false);
+
     // Wait for all of the threads to finish
-    while (runners)
+    while (atomic_load(&runners))
     {
-        mtx_lock(&thrMutex);
-        
-        // Check if a thread notified us it is done solving
-        if (cnd_wait(&thrCond, &thrMutex) != thrd_success)
-        {
-            fprintf(stderr, "The main thread could not wait for a negamax worker thread.\n");
-            exit(EXIT_FAILURE);
-        }
-        
-        mtx_unlock(&thrMutex);
+        // Check if a thread notified us it has finished solving
+        mtx_lock(&thrFinishMutex);
+        cnd_wait(&thrFinishCondV, &thrFinishMutex);
+        mtx_unlock(&thrFinishMutex);
         
         // Print the finished thread's results
-        printf("%d%c ", dropList[finishID] >> 4, 'A' + (dropList[finishID] & 0xf));
-        Result_print(&thrArgs[finishID].result, _bestResl ? _bestResl : &thrArgs[finishID].result);
+        finished = atomic_load(&finishID);
+        printf("%d%c ", dropList[finished] >> 4, 'A' + (dropList[finished] & 0xf));
+        Result_print(&thrArgs[finished].result, _bestResl ? _bestResl : &thrArgs[finished].result);
         puts("");
         
         // Reassign that thread to another unsolved move whenever possible
         if (nextUnsolved < dropCount)
         {
-            thrArgs[finishID].ms = *_ms;
-            MakeSeven_drop(&thrArgs[finishID].ms, dropList[nextUnsolved] >> 4, dropList[nextUnsolved] & 0xf);
-            TranspositionTable_destroy(&thrTT[finishID]);
+            thrArgs[finished].ms = *_ms;
+            MakeSeven_drop(&thrArgs[finished].ms, dropList[nextUnsolved] >> 4, dropList[nextUnsolved] & 0xf);
             
-            if (!TranspositionTable_initialize(&thrTT[finishID], thrTableSize))
+            if (!TranspositionTable_initialize(&thrTT[nextUnsolved % thrCount], thrTableSize + 1))
             {
-                fprintf(stderr, "Could not reinitialize the transposition table for thread #%d.\n", finishID);
+                fprintf(stderr, "Could not reinitialize the transposition table for thread #%d.\n", finished);
                 exit(EXIT_FAILURE);
-            }  
+            }
             
-            switch (thrd_create(&thread[finishID], Negamax_worker, &thrArgs[nextUnsolved]))
+            switch (thrd_create(&thread[finished], Negamax_worker, &thrArgs[nextUnsolved]))
             {
             case thrd_error:
                 fprintf(stderr, "Could not reassign thread #%d to another unsolved move.\n", t);
@@ -330,7 +352,7 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
                 fprintf(stderr, "Could not allocate thread #%d for reassignment to another unsolved move.\n", t);
                 exit(EXIT_FAILURE);
             default:
-                ++runners;
+                atomic_fetch_add(&runners, 1);
                 ++nextUnsolved;
             }
         }
@@ -385,8 +407,10 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
     }
     
     // Clean up mutexes and condition variables
-    mtx_destroy(&thrMutex);
-    cnd_destroy(&thrCond);
+    mtx_destroy(&thrFinishMutex);
+    mtx_destroy(&thrStartMutex);
+    cnd_destroy(&thrFinishCondV);
+    cnd_destroy(&thrStartCondV);
     
     return _bestResl ? *_bestResl : bestResl;
 }

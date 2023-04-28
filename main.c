@@ -10,6 +10,7 @@
 
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
 
 #if defined(_WIN64) || defined(_WIN32)
 #include <windows.h>
@@ -68,7 +69,7 @@ int main(int argc, char **argv)
 #if defined(_WIN64) || defined(_WIN32)
     SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
 #elifdef __linux__
-    setpriority(getpid(), PRIO_PROCESS, 10);
+    setpriority(PRIO_PROCESS, getpid(), 10);
 #endif
     
     // Read command-line arguments and set flags accordingly

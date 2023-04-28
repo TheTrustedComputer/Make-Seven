@@ -280,6 +280,7 @@ uint8_t MCTS_search(const MakeSeven *_MS, const void *_WIN_HND, const bool _OUTP
         // Check immediate wins and losses, rewarding them with higher scores
         sims = MakeSeven_tilesSumToSeven(&mctsMS) ? MAKESEVEN_AREA_P1 - mctsMS.plyNum : MCTS_simulate(&mctsMS, mctsMS.plyNum & 1) * (leaf->depth >> 1);
         
+        
         // Simulation and backpropagation
         MCTS_backpropagate(leaf, sims);
         

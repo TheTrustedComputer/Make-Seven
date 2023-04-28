@@ -52,8 +52,6 @@ typedef struct MCTSNode
     struct MCTSNode *ancestor, *descendants;
     long long points, visits;
     uint8_t move, count, depth;
-    /*uint8_t wins, losses;
-    int8_t outcome : 7, solved : 1;*/
 }
 MCTSNode;
 
