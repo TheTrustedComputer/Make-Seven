@@ -49,8 +49,8 @@ static atomic_bool runMCTS = true;
 // Rather, it is updated as the algorithm progresses
 typedef struct MCTSNode
 {
-    struct MCTSNode *ancestor, *descendants;
     long long points, visits;
+    struct MCTSNode *ancestor, *descendants;
     uint8_t move, count, depth;
 }
 MCTSNode;
@@ -66,8 +66,9 @@ MCTSResult;
 // MCTSNode root parallelization worker thread
 typedef struct
 {
-    MakeSeven copyMS, *originMS;
+    MakeSeven copyMS;
     MCTSNode localRoot, *globalRoot;
+    MakeSeven *originMS;
     mtx_t *gRootLock;
     atomic_ullong *iters;
     int id;

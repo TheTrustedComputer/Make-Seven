@@ -52,15 +52,16 @@ static int thrCount;
 typedef struct
 {
     MakeSeven ms;
-    int *count, id;
+    int *count;
     atomic_int *running, *finishID;
+    atomic_bool *idle;
     mtx_t *startMtx, *finishMtx;
     cnd_t *startCnd, *finishCnd;
     TranspositionTable *table;
     Result *results, result;
+    int id;
     uint8_t move;
     bool verbose;
-    atomic_bool *idle;
 }
 NegamaxThread;
 

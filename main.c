@@ -501,7 +501,7 @@ int main(int argc, char **argv)
                 npsec = (double)(nodes) / (sec ? sec : sec + 1.0);
                 printf("\a");
                 assert((r.wdl == WIN_CHAR && !(r.dt7 & 1)) || (r.wdl == DRAW_CHAR) || (r.wdl == LOSS_CHAR && (r.dt7 & 1)) || (r.wdl == UNKNOWN_CHAR));
-                assert((oldMS.player[0] == ms.player[0]) && (oldMS.player[1] == ms.player[1]) && (oldMS.tiles23[0] && ms.tiles23[0]) && (oldMS.tiles23[1] && ms.tiles23[1]));
+                assert((oldMS.player[0] == ms.player[0]) && (oldMS.player[1] == ms.player[1]) && (oldMS.tiles23[0] == ms.tiles23[0]) && (oldMS.tiles23[1] == ms.tiles23[1]));
                 assert((oldMS.plyNum == ms.plyNum) && (oldMS.remaining[0] == ms.remaining[0]) && (oldMS.remaining[1] == ms.remaining[1]) && (oldMS.remaining[2] == ms.remaining[2]));
                 
 #if defined(_WIN64) || defined(_WIN32)

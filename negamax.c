@@ -107,7 +107,6 @@ int Negamax_worker(void *_negamaxWorkArgs)
     assert(nt->table);
     assert(nt->table->tableEntry);
     thrd_yield();
-    
     mtx_lock(nt->startMtx);
     
     // Wait for the start barrier
@@ -116,9 +115,8 @@ int Negamax_worker(void *_negamaxWorkArgs)
         cnd_wait(nt->startCnd, nt->startMtx);
     }
     
-    mtx_unlock(nt->startMtx);
-    
     // Solve this assigned position and set the result for this move
+    mtx_unlock(nt->startMtx);
     nt->result = Negamax_solve(&nt->ms, nt->table, nt->verbose);
     Result_increment(&nt->result);
     nt->results[nt->move & 0xf] = nt->result;  
