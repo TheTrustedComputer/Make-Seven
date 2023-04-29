@@ -52,9 +52,8 @@ static int thrCount;
 typedef struct
 {
     MakeSeven ms;
-    int *count;
-    atomic_int *running, *finishID;
-    atomic_bool *idle;
+    int *count, *running, *finishID;
+    bool *idle;
     mtx_t *startMtx, *finishMtx;
     cnd_t *startCnd, *finishCnd;
     TranspositionTable *table;

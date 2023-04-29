@@ -104,13 +104,11 @@ int Negamax_worker(void *_negamaxWorkArgs)
 {
     NegamaxThread *nt = _negamaxWorkArgs;
     
-    assert(nt->table);
-    assert(nt->table->tableEntry);
     thrd_yield();
     mtx_lock(nt->startMtx);
     
     // Wait for the start barrier
-    while (atomic_load(nt->idle) && (atomic_load(nt->running) < *nt->count))
+    while (*nt->idle && (*nt->running < *nt->count))
     {
         cnd_wait(nt->startCnd, nt->startMtx);
     }
@@ -126,8 +124,8 @@ int Negamax_worker(void *_negamaxWorkArgs)
     if (cnd_signal(nt->finishCnd) == thrd_success)
     {
         // Decrement the number of running threads and save this thread's ID
-        atomic_fetch_sub(nt->running, 1);
-        atomic_store(nt->finishID, nt->id);
+        --(*nt->running);
+        *nt->finishID = nt->id;
     }
     
     mtx_unlock(nt->finishMtx);
@@ -161,12 +159,11 @@ Result Negamax_solve(MakeSeven *_ms, TranspositionTable *_tt, const bool _VERBOS
 
 Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1, Result *_r2, Result *_r3, Result *_bestResl, uint8_t *_bestMove)
 {
-    int t, tileN, colN, finished;
-    atomic_int runners, finishID;
+    int t, tileN, colN, runners, finishID;
     unsigned thrTableSize;
-    uint8_t dropList[MAKESEVEN_SIZE_X3], dropCount, nextUnsolved;
     Result bestResl;
-    atomic_bool idle;
+    uint8_t dropList[MAKESEVEN_SIZE_X3], dropCount, nextUnsolved;
+    bool idle;
     
     // Condition variables and mutexes for signaling
     mtx_t thrFinishMutex, thrStartMutex;
@@ -220,7 +217,7 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
             .finishMtx = &thrFinishMutex,
             .startCnd = &thrStartCondV,
             .finishCnd = &thrFinishCondV,
-            .table = &thrTT[t % thrCount],
+            .table = &thrTT[t],
             .move = dropList[t],
             .verbose = _VERBOSE,
             .idle = &idle
@@ -276,8 +273,8 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
     }
     
     nextUnsolved = thrCount;
-    atomic_init(&runners, 0);
-    atomic_init(&idle, true);
+    runners = 0;
+    idle = true;
     
     // Solve the position in parallel; each thread holds a copy of the game state to ensure no data races when making moves
     // However, the transposition table is unprotected, so threads may overwrite entries when one thread is still reading them
@@ -303,7 +300,7 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
                 fprintf(stderr, "Could not allocate thread #%d.\n", t);
                 exit(EXIT_FAILURE);
             default:
-                atomic_fetch_add(&runners, 1);
+                ++runners;
                 break;
             }
         }
@@ -313,10 +310,10 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
     mtx_lock(&thrStartMutex);
     cnd_broadcast(&thrStartCondV);
     mtx_unlock(&thrStartMutex);
-    atomic_store(&idle, false);
+    idle = false;
 
     // Wait for all of the threads to finish
-    while (atomic_load(&runners))
+    while (runners)
     {
         // Check if a thread notified us it has finished solving
         mtx_lock(&thrFinishMutex);
@@ -324,24 +321,24 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
         mtx_unlock(&thrFinishMutex);
         
         // Print the finished thread's results
-        finished = atomic_load(&finishID);
-        printf("%d%c ", dropList[finished] >> 4, 'A' + (dropList[finished] & 0xf));
-        Result_print(&thrArgs[finished].result, _bestResl ? _bestResl : &thrArgs[finished].result);
+        printf("%d%c ", dropList[finishID] >> 4, 'A' + (dropList[finishID] & 0xf));
+        Result_print(&thrArgs[finishID].result, _bestResl ? _bestResl : &thrArgs[finishID].result);
         puts("");
         
         // Reassign that thread to another unsolved move whenever possible
         if (nextUnsolved < dropCount)
         {
-            thrArgs[finished].ms = *_ms;
-            MakeSeven_drop(&thrArgs[finished].ms, dropList[nextUnsolved] >> 4, dropList[nextUnsolved] & 0xf);
+            thrArgs[finishID].ms = *_ms;
+            MakeSeven_drop(&thrArgs[finishID].ms, dropList[nextUnsolved] >> 4, dropList[nextUnsolved] & 0xf);
+            TranspositionTable_destroy(&thrTT[finishID]);
             
-            if (!TranspositionTable_initialize(&thrTT[nextUnsolved % thrCount], thrTableSize + 1))
+            if (!TranspositionTable_initialize(&thrTT[nextUnsolved], thrTableSize + 1))
             {
-                fprintf(stderr, "Could not reinitialize the transposition table for thread #%d.\n", finished);
+                fprintf(stderr, "Could not reinitialize the transposition table for thread #%d.\n", finishID);
                 exit(EXIT_FAILURE);
             }
             
-            switch (thrd_create(&thread[finished], Negamax_worker, &thrArgs[nextUnsolved]))
+            switch (thrd_create(&thread[finishID], Negamax_worker, &thrArgs[nextUnsolved]))
             {
             case thrd_error:
                 fprintf(stderr, "Could not reassign thread #%d to another unsolved move.\n", t);
@@ -350,7 +347,7 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
                 fprintf(stderr, "Could not allocate thread #%d for reassignment to another unsolved move.\n", t);
                 exit(EXIT_FAILURE);
             default:
-                atomic_fetch_add(&runners, 1);
+                ++runners;
                 ++nextUnsolved;
             }
         }
