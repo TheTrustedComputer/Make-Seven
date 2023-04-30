@@ -402,7 +402,9 @@ int main(int argc, char **argv)
         
         // Solving loop
         while (running)
-        {        
+        {       
+            over = false;
+             
             // Get move sequence from command line arguments
             if (argSeq[0])
             {
@@ -481,7 +483,7 @@ int main(int argc, char **argv)
             else
             {
                 // Time the search and print the solution, ensuring that the solution is valid for the game
-                nodes = 0ull;
+                atomic_store(&nodes, 0);
                 
                 if (parallel)
                 {
@@ -498,7 +500,7 @@ int main(int argc, char **argv)
                     sec = (double)(stopwatch) / CLOCKS_PER_SEC;
                 }
                 
-                npsec = (double)(nodes) / (sec ? sec : sec + 1.0);
+                npsec = (double)(atomic_load(&nodes)) / (sec ? sec : sec + 1.0);
                 printf("\a");
                 assert((r.wdl == WIN_CHAR && !(r.dt7 & 1)) || (r.wdl == DRAW_CHAR) || (r.wdl == LOSS_CHAR && (r.dt7 & 1)) || (r.wdl == UNKNOWN_CHAR));
                 assert((oldMS.player[0] == ms.player[0]) && (oldMS.player[1] == ms.player[1]) && (oldMS.tiles23[0] == ms.tiles23[0]) && (oldMS.tiles23[1] == ms.tiles23[1]));
@@ -518,7 +520,7 @@ int main(int argc, char **argv)
 #else
                 (r.wdl == DRAW_CHAR) ? printf("\e[1;33m%s\e[0m ", DRAW_TEXT) : Result_print(&r, &r);
 #endif
-                printf("%llu %.0f %.3f\n", nodes, npsec, sec);
+                printf("%llu %.0f %.3f\n", atomic_load(&nodes), npsec, sec);
                 
                 // Do not show the solutions for all the moves if ran with arguments
                 if (!argSeq[0])

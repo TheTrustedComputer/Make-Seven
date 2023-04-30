@@ -40,7 +40,7 @@
 #define MAKESEVEN_SIZE_P2 9
 #define MAKESEVEN_SIZE_X3 21
 #define MAKESEVEN_AREA 49
-#define MAKESEVEN_AREA_P1 50
+#define MAKESEVEN_AREA_P2 51
 #define MAKESEVEN_AREA_X2 98
 
 // Make Seven static bitmaps; it works pretty much more or less the same as any Connect Four implementation.

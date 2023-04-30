@@ -35,11 +35,7 @@
 // sqrt(2) is a good balance between exploration and exploitation
 // smalller = more exploitation; larger = more exploration
 #define MCTS_UCT_C 1.41421356237309504880168872420969807856967187537694807317667973799073247846210703885l
-
-#define MCTS_INVALID -100.0l // Valid range is [-50, 50] 
-#define MCTS_WIN 1
-#define MCTS_DRAW 0
-#define MCTS_LOSS -1
+#define MCTS_INVALID -100.0l // Valid range is [-50, 50]
 
 // Flag to run the search via Ctrl-C
 static atomic_bool runMCTS = true;
@@ -51,7 +47,7 @@ typedef struct MCTSNode
 {
     long long points, visits;
     struct MCTSNode *ancestor, *descendants;
-    uint8_t move, count, depth;
+    uint8_t move, count;
 }
 MCTSNode;
 
@@ -76,6 +72,7 @@ typedef struct
 }
 MCTSRootThread;
 
+/*
 // Leaf parallelization worker thread
 typedef struct
 {
@@ -96,10 +93,10 @@ typedef struct
     cnd_t *notEmpty, *notFull;
 }
 MTCSWorkQueue;
-
+*/
 
 // Memory management
-void MCTSNode_initialize(MCTSNode*, MCTSNode*, MCTSNode*, const uint8_t, const uint8_t);                        // Initialize a Monte Carlo tree search node
+void MCTSNode_initialize(MCTSNode*, MCTSNode*, MCTSNode*, const uint8_t);                                       // Initialize a Monte Carlo tree search node
 void MCTSNode_destroy(MCTSNode*);                                                                               // Recursively release memory from it and its descendants
 
 // Functions for debugging
@@ -118,8 +115,6 @@ uint8_t MCTS_search(const MakeSeven*, const void*, const bool);                 
 static inline void MCTS_stop(int);                                                                              // Toggle the run flag to stop after receiving SIGINT
 void MCTS_progress(const MCTSResult*, const void*, const unsigned long long, const unsigned long long);
 void MCTS_pointStats(const void*, const long double*, const long double*, const long double*);
-
-// Monte Carlo with minimax backpropagation
 
 // Multi-threading
 void MCTSNode_update(MCTSNode*, MCTSNode*, const uint8_t);

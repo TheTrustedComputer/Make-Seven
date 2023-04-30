@@ -11,13 +11,12 @@
  *  @param _MOVE    The move that led to this node.
  *  @param _DEPTH   The tree depth of this node.
  */
-void MCTSNode_initialize(MCTSNode *_init, MCTSNode *_ancest, MCTSNode *_descends, const uint8_t _MOVE, const uint8_t _DEPTH)
+void MCTSNode_initialize(MCTSNode *_init, MCTSNode *_ancest, MCTSNode *_descends, const uint8_t _MOVE)
 {
     _init->ancestor = _ancest;
     _init->descendants = _descends;
     _init->points = _init->visits = _init->count = 0;
     _init->move = _MOVE;
-    _init->depth = _DEPTH;
 }
 
 void MCTSNode_destroy(MCTSNode *_destroyer)
@@ -146,7 +145,7 @@ bool MCTS_expand(MCTSNode *_expander, const MakeSeven *_MS)
         // Expand the nodes and add them to the list of descendants
         for (n = 0; n < _expander->count; ++n)
         {
-            MCTSNode_initialize(&expandee, _expander, NULL, dropList[n], _expander->depth + 1);
+            MCTSNode_initialize(&expandee, _expander, NULL, dropList[n]);
             _expander->descendants[n] = expandee;
         }
     }
@@ -180,12 +179,12 @@ long long MCTS_simulate(MakeSeven *_simulMS, const uint8_t _TURN)
             // If there is a win or a loss, return the score depending on the player who started the simulation
             if (MakeSeven_tilesSumToSeven(_simulMS))
             {
-                return _TURN == (_simulMS->plyNum & 1) ? MCTS_WIN : MCTS_LOSS;
+                return _TURN == (_simulMS->plyNum & 1) ? 1 : -1;
             }
         }
         else
         {
-            return MCTS_DRAW;
+            return 0;
         }
     }
 }
@@ -255,7 +254,7 @@ uint8_t MCTS_search(const MakeSeven *_MS, const void *_WIN_HND, const bool _OUTP
     
     // Catch SIGINT to stop the search
     signal(SIGINT, MCTS_stop);
-    MCTSNode_initialize(&root, NULL, NULL, 0, 0);
+    MCTSNode_initialize(&root, NULL, NULL, 0);
     
     for (progress = time(NULL), i = secs = 0; atomic_load(&runMCTS); ++i)
     {
@@ -278,7 +277,7 @@ uint8_t MCTS_search(const MakeSeven *_MS, const void *_WIN_HND, const bool _OUTP
         }
         
         // Check immediate wins and losses, rewarding them with higher scores
-        sims = MakeSeven_tilesSumToSeven(&mctsMS) ? MAKESEVEN_AREA_P1 - mctsMS.plyNum : MCTS_simulate(&mctsMS, mctsMS.plyNum & 1) * (leaf->depth >> 1);
+        sims = MakeSeven_tilesSumToSeven(&mctsMS) ? (MAKESEVEN_AREA_P2 - mctsMS.plyNum) >> 1 : MCTS_simulate(&mctsMS, mctsMS.plyNum & 1);
         
         
         // Simulation and backpropagation
@@ -574,7 +573,7 @@ int MCTS_rootWorker(void *_mctsWorkArgs)
         }
         
         // Simulate and backpropagate
-        localSims = MakeSeven_tilesSumToSeven(&mrt->copyMS) ? MAKESEVEN_AREA_P1 - mrt->copyMS.plyNum : MCTS_simulate(&mrt->copyMS, mrt->copyMS.plyNum & 1) * (leaf->depth >> 1);
+        localSims = MakeSeven_tilesSumToSeven(&mrt->copyMS) ? (MAKESEVEN_AREA_P2 - mrt->copyMS.plyNum) >> 1 : MCTS_simulate(&mrt->copyMS, mrt->copyMS.plyNum & 1);
         MCTS_backpropagate(leaf, localSims);
         
         // Reset the local game state for another iteration
@@ -666,7 +665,7 @@ uint8_t MCTS_rootParallel(MakeSeven *_MS, const void *_WIN_HND, const bool _OUTP
     
     for (t = 0; t < mvCount; ++t)
     {
-        MCTSNode_initialize(&thrGRoot[t], NULL, NULL, list[t], 0);
+        MCTSNode_initialize(&thrGRoot[t], NULL, NULL, list[t]);
     }
     
     if (mtx_init(&rootLock, mtx_plain) != thrd_success)
@@ -678,7 +677,7 @@ uint8_t MCTS_rootParallel(MakeSeven *_MS, const void *_WIN_HND, const bool _OUTP
     // Initialize thread arguments and create the threads
     for (t = 0; t < thrCount; ++t)
     {
-        MCTSNode_initialize(&thrLRoots[t], NULL, NULL, 0, 0);
+        MCTSNode_initialize(&thrLRoots[t], NULL, NULL, 0);
         
         thrArgs[t] = (MCTSRootThread)
         {

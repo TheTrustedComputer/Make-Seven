@@ -174,6 +174,7 @@ Result Result_getBestResult(Result *_r1, Result *_r2, Result *_r3)
                 case WIN_CHAR:
                     best = _r1[i];
                     score = _r1[i].wdl == DRAW_CHAR ? 1 : 2;
+                    continue;
                 }
                 
                 switch (_r2[i].wdl)
@@ -188,6 +189,7 @@ Result Result_getBestResult(Result *_r1, Result *_r2, Result *_r3)
                 case WIN_CHAR:
                     best = _r2[i];
                     score = _r2[i].wdl == DRAW_CHAR ? 1 : 2;
+                    continue;
                 }
                 
                 switch (_r3[i].wdl)
@@ -202,6 +204,7 @@ Result Result_getBestResult(Result *_r1, Result *_r2, Result *_r3)
                 case WIN_CHAR:
                     best = _r3[i];
                     score = _r3[i].wdl == DRAW_CHAR ? 1 : 2;
+                    continue;
                 }
                 break;
             case 1:

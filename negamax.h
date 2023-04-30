@@ -37,7 +37,7 @@ enum NegamaxScore
 };
 
 // Counter for the number of game tree nodes evaluated
-static unsigned long long nodes;
+static atomic_ullong nodes;
 
 // Array to hold the move order; the score obtained from the transposition table
 static int moveOrder[MAKESEVEN_SIZE], tableScore;
@@ -52,8 +52,8 @@ static int thrCount;
 typedef struct
 {
     MakeSeven ms;
-    int *count, *running, *finishID;
-    bool *idle;
+    atomic_int *running, *finishID;
+    atomic_bool *idle, *solved;
     mtx_t *startMtx, *finishMtx;
     cnd_t *startCnd, *finishCnd;
     TranspositionTable *table;
