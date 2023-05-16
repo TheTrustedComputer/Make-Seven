@@ -6,103 +6,78 @@
 
 void Negamax_setColumnMoveOrder(void)
 {
-    for (int i = 0; i < MAKESEVEN_SIZE; ++i) // Center to outermost
+    for (int i = 0; i < MAKE7_SIZE; i++) // Center to outermost
     {
-        moveOrder[i] = MAKESEVEN_SIZE / 2 + (1 - 2 * (i & 1)) * (i + 1) / 2;
+        moveOrder[i] = (MAKE7_SIZE >> 1) + (1 - 2 * (i & 1)) * ((i + 1) >> 1);
     }
 }
 
-bool Negamax_checkForSeven(const MakeSeven *_ms)
-{
-    MakeSeven ms = *_ms;
-    uint8_t num, col;
-    
-    // Make all possible drops and check for sum of seven, then revert to original game state
-    for (num = 4; --num;)
-    {
-        for (col = 0; col < MAKESEVEN_SIZE; ++col)
-        {
-            if (MakeSeven_drop(&ms, num, col))
-            {
-                if (MakeSeven_tilesSumToSeven(&ms))
-                {
-                    return true;
-                }
-                
-                ms = *_ms;
-            }
-        }
-    }
-    
-    return false;
-}
-
-int Negamax_search(MakeSeven *_ms, TranspositionTable *_tt, int _d, int _a, int _b)
+int Negamax_search(Make7 *_m7, TransTable *_tt, const int  _D, int _a, int _b)
 {
     int rootScore, leafScore;
-    uint8_t t, c;
+    uint8_t tile, col;
     
     // Increment the number of game tree nodes searched
     atomic_fetch_add(&nodes, 1);
     
     // See if the score is in the transposition table
-    if (abs((tableScore = TranspositionTable_loadVal(_tt, MakeSeven_hashEncode(_ms), _ms->tiles23[0], _ms->tiles23[1]))) >= NM_WIN)
+    if ((tableScore = TransTable_load(_tt, Make7_hashEncode(_m7), _m7->tiles23[0], _m7->tiles23[1])))
     {
         return tableScore;
     }
     
     // Check for a "Make 7"
-    if (Negamax_checkForSeven(_ms))
+    if (Make7_checkFor7(_m7))
     {
         return NM_WIN; // The current player wins
     }
     
     // Check if the player cannot make any more moves or hiting maxiumum depth
-    if (!_d || MakeSeven_hasNoMoreMoves(_ms))
+    if (!_D || Make7_noMoreMoves(_m7))
     {
         return NM_DRAW; // Assume a draw
     }
     
     rootScore = _a;
     
-    for (t = 4; --t;)
+    for (tile = 4; --tile;)
     {
-        for (c = 0; c < MAKESEVEN_SIZE; ++c)
+        for (col = 0; col < MAKE7_SIZE; col++)
         {
-            if (MakeSeven_drop(_ms, t, moveOrder[c]))
+            if (Make7_drop(_m7, tile, moveOrder[col]))
             {
                 // Drop tiles and see if our score beats the current best score
-                if ((leafScore = -Negamax_search(_ms, _tt, _d - 1, -_b, -_a)) > rootScore)
+                if ((leafScore = -Negamax_search(_m7, _tt, _D - 1, -_b, -_a)) > rootScore)
                 {
                     rootScore = leafScore;
                 }
                 
-                MakeSeven_undrop(_ms);
+                Make7_undrop(_m7);
                 
-                // Update best score if it's better than the current best, and store lower bound
-                if (rootScore > _a)
+                // Update best score if it's better than the current best, and store the lower bound
+                if (_a < rootScore)
                 {
-                    TranspositionTable_storeVal(_tt, MakeSeven_hashEncode(_ms), _ms->tiles23[0], _ms->tiles23[1], (_a = rootScore));
-                }
-                
-                // Alpha cut-off
-                if (_a >= _b)
-                {
-                    return _a;
+                    TransTable_store(_tt, Make7_hashEncode(_m7), _m7->tiles23[0], _m7->tiles23[1], (_a = rootScore));
+                    
+                    // Alpha cut-off
+                    if (_a >= _b)
+                    {
+                        return _a;
+                    }
                 }
             }
         }
     }
     
-    // Save upper bound
-    TranspositionTable_storeVal(_tt, MakeSeven_hashEncode(_ms), _ms->tiles23[0], _ms->tiles23[1], _a);
+    // Save the upper bound
+    TransTable_store(_tt, Make7_hashEncode(_m7), _m7->tiles23[0], _m7->tiles23[1], _a);
 
     return _a;
 }
 
-int Negamax_worker(void *_negamaxWorkArgs)
+int Negamax_worker(void *_args)
 {
-    NegamaxThread *nt = _negamaxWorkArgs;
+    NegamaxArgs *nt = _args;
     
     mtx_lock(nt->startMtx);
     
@@ -114,7 +89,7 @@ int Negamax_worker(void *_negamaxWorkArgs)
     
     // Solve this assigned position and set the result for this move
     mtx_unlock(nt->startMtx);
-    nt->result = Negamax_solve(&nt->ms, nt->table, nt->verbose);
+    nt->result = Negamax_solve(&nt->m7, nt->table, nt->verbose);
     Result_increment(&nt->result);
     nt->results[nt->move & 0xf] = nt->result;
     mtx_lock(nt->finishMtx);
@@ -133,12 +108,15 @@ int Negamax_worker(void *_negamaxWorkArgs)
     return 0;
 }
 
-Result Negamax_solve(MakeSeven *_ms, TranspositionTable *_tt, const bool _VERBOSE)
+Result Negamax_solve(Make7 *_m7, TransTable *_tt, const bool _VERBOSE)
 {
-    int solution, depth, maxDepth = 49 - _ms->plyNum;
+    int solution, depth, maxDep;
+    
+    solution = NM_DRAW;
+    maxDep = 49 - _m7->plyNum;
     
     // Iterative deepening to solve shallow wins and losses
-    for (solution = NM_DRAW, depth = 0; depth < maxDepth; ++depth)
+    for (depth = 0; depth < maxDep; depth++)
     {
         if (_VERBOSE)
         {
@@ -148,7 +126,7 @@ Result Negamax_solve(MakeSeven *_ms, TranspositionTable *_tt, const bool _VERBOS
 #endif
         }
         
-        if (abs((solution = Negamax_search(_ms, _tt, depth, -NM_WIN, NM_WIN))) >= NM_WIN)
+        if (abs((solution = Negamax_search(_m7, _tt, depth, -NM_WIN, NM_WIN))) >= NM_WIN)
         {
             return (Result) { solution > 0 ? WIN_CHAR : LOSS_CHAR, depth };
         }
@@ -157,25 +135,25 @@ Result Negamax_solve(MakeSeven *_ms, TranspositionTable *_tt, const bool _VERBOS
     return RESULT_DRAW;
 }
 
-Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1, Result *_r2, Result *_r3, Result *_bestResl, uint8_t *_bestMove)
+Result Negamax_solve_parallel(Make7 *_m7, const bool _VERBOSE, Result *_r1, Result *_r2, Result *_r3, Result *_bestResl, uint8_t *_bestMove)
 {
-    int t, tileN, colN, finished, terminals;
+    int thr, tileN, colN, finished, terminals;
     atomic_int thrRunners, finishTID;
     unsigned thrTableSize;
     Result bestResl;
-    uint8_t dropList[MAKESEVEN_SIZE_X3], dropCount, nextUnsolved;
+    uint8_t dropList[MAKE7_SIZE_X3], dropCount, nextUnsolved;
     atomic_bool idle, thrSolved;
     mtx_t thrFinishMutex, thrStartMutex;
     cnd_t thrFinishCondV, thrStartCondV;
     
     // Generate all possible moves in the given position
-    MakeSeven_generate(_ms, dropList, &dropCount);
+    Make7_generate(_m7, dropList, &dropCount);
     
     // Thread handles and arguments
     thrd_t thread[dropCount];
-    NegamaxThread thrArgs[dropCount];
+    NegamaxArgs thrArgs[dropCount];
     bool winOnFirst[dropCount];
-    TranspositionTable thrTT[dropCount];
+    TransTable thrTT[dropCount];
     
     // Perform lazy thread creation; one drop move per thread
 #if defined (_WIN64) || defined (_WIN32)
@@ -191,23 +169,23 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
 #endif
     
     // Make it work with systems with low memory requirements
-    if ((thrTableSize = TranspositionTable_prevprime((table.size + 1) / thrCount)) < TT_HASHSIZE)
+    if ((thrTableSize = TransTable_prevprime((table.size + 1) / thrCount)) < TT_HASHSIZE)
     {
         thrTableSize = TT_HASHSIZE;
     }
 
     // Initialize the results with unknown values
-    for (t = 0; t < MAKESEVEN_SIZE; ++t)
+    for (thr = 0; thr < MAKE7_SIZE; thr++)
     {
-        _r1[t].wdl = _r2[t].wdl = _r3[t].wdl = UNKNOWN_CHAR;
+        _r1[thr].wdl = _r2[thr].wdl = _r3[thr].wdl = UNKNOWN_CHAR;
     }
     
     // Initialize game states, mutexes, condition variables, and results
-    for (t = terminals = 0; t < dropCount; ++t)
+    for (terminals = thr = 0; thr < dropCount; thr++)
     {
-        thrArgs[t] = (NegamaxThread)
+        thrArgs[thr] = (NegamaxArgs)
         { 
-            .ms = *_ms,
+            .m7 = *_m7,
             .running = &thrRunners,
             .finishID = &finishTID,
             .idle = &idle,
@@ -216,34 +194,34 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
             .finishMtx = &thrFinishMutex,
             .startCnd = &thrStartCondV,
             .finishCnd = &thrFinishCondV,
-            .table = &thrTT[t],
-            .id = t,
-            .move = dropList[t],
+            .table = &thrTT[thr],
+            .id = thr,
+            .move = dropList[thr],
             .verbose = _VERBOSE
         };
         
-        winOnFirst[t] = false;
-        tileN = dropList[t] >> 4;
-        MakeSeven_drop(&thrArgs[t].ms, tileN, dropList[t] & 0xf);
+        winOnFirst[thr] = false;
+        tileN = dropList[thr] >> 4;
+        Make7_drop(&thrArgs[thr].m7, tileN, dropList[thr] & 0xf);
         
         // Assign the results array to the correct thread
         switch (tileN)
         {
         case 1:
-            thrArgs[t].results = _r1;
+            thrArgs[thr].results = _r1;
             break;
         case 2:
-            thrArgs[t].results = _r2;
+            thrArgs[thr].results = _r2;
             break;
         case 3:
-            thrArgs[t].results = _r3;
+            thrArgs[thr].results = _r3;
         }
         
         // Search for a win on the first move and do not create a thread for it
-        if (MakeSeven_tilesSumToSeven(&thrArgs[t].ms))
+        if (Make7_tilesSumTo7(&thrArgs[thr].m7))
         {
-            winOnFirst[t] = true;
-            ++terminals;
+            winOnFirst[thr] = true;
+            terminals++;
         }
     }
     
@@ -279,24 +257,24 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
     
     // Solve the position in parallel; each thread holds a copy of the game state to ensure no data races when making moves
     // It is difficult to parallelize minimax with alpha-beta pruning effectively, as it is an inherently sequential algorithm
-    for (t = 0; t < thrCount; ++t)
+    for (thr = 0; thr < thrCount; thr++)
     {
         // Start the threads
-        if (!winOnFirst[t])
+        if (!winOnFirst[thr])
         {
-            if (!TranspositionTable_initialize(&thrTT[t], thrTableSize + 1))
+            if (!TransTable_initialize(&thrTT[thr], thrTableSize + 1))
             {
-                fprintf(stderr, "Could not initialize the transposition table for thread #%d.\n", t);
+                fprintf(stderr, "Could not initialize the transposition table for thread #%d.\n", thr);
                 exit(EXIT_FAILURE);
             }
             
-            switch (thrd_create(&thread[t], Negamax_worker, &thrArgs[t]))
+            switch (thrd_create(&thread[thr], Negamax_worker, &thrArgs[thr]))
             {
             case thrd_error:
-                fprintf(stderr, "Could not create thread #%d.\n", t);
+                fprintf(stderr, "Could not create thread #%d.\n", thr);
                 exit(EXIT_FAILURE);
             case thrd_nomem:
-                fprintf(stderr, "Could not allocate thread #%d.\n", t);
+                fprintf(stderr, "Could not allocate thread #%d.\n", thr);
                 exit(EXIT_FAILURE);
             default:
                 atomic_fetch_add(&thrRunners, 1);
@@ -328,11 +306,11 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
             // Reassign that thread to another unsolved move whenever possible
             if (nextUnsolved < dropCount)
             {
-                thrArgs[finished].ms = *_ms;
-                MakeSeven_drop(&thrArgs[finished].ms, dropList[nextUnsolved] >> 4, dropList[nextUnsolved] & 0xf);
-                TranspositionTable_destroy(&thrTT[finished]);
+                thrArgs[finished].m7 = *_m7;
+                Make7_drop(&thrArgs[finished].m7, dropList[nextUnsolved] >> 4, dropList[nextUnsolved] & 0xf);
+                TransTable_destroy(&thrTT[finished]);
                 
-                if (!TranspositionTable_initialize(&thrTT[nextUnsolved], thrTableSize + 1))
+                if (!TransTable_initialize(&thrTT[nextUnsolved], thrTableSize + 1))
                 {
                     fprintf(stderr, "Could not reinitialize the transposition table for thread #%d.\n", finished);
                     exit(EXIT_FAILURE);
@@ -341,14 +319,14 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
                 switch (thrd_create(&thread[finished], Negamax_worker, &thrArgs[nextUnsolved]))
                 {
                 case thrd_error:
-                    fprintf(stderr, "Could not reassign thread #%d to another unsolved move.\n", t);
+                    fprintf(stderr, "Could not reassign thread #%d to another unsolved move.\n", thr);
                     exit(EXIT_FAILURE);
                 case thrd_nomem:
-                    fprintf(stderr, "Could not allocate thread #%d for reassignment to another unsolved move.\n", t);
+                    fprintf(stderr, "Could not allocate thread #%d for reassignment to another unsolved move.\n", thr);
                     exit(EXIT_FAILURE);
                 default:
                     atomic_fetch_add(&thrRunners, 1);
-                    ++nextUnsolved;
+                    nextUnsolved++;
                 }
             }
             
@@ -364,27 +342,27 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
     }
     
     // Join the threads to the main thread
-    for (t = 0; t < thrCount; ++t)
+    for (thr = 0; thr < thrCount; thr++)
     {
-        if (!winOnFirst[t])
+        if (!winOnFirst[thr])
         {
-            if (thrd_join(thread[t], NULL) == thrd_error)
+            if (thrd_join(thread[thr], NULL) == thrd_error)
             {
-                fprintf(stderr, "Could not join negamax worker thread #%d to the main thread.\n", t);
+                fprintf(stderr, "Could not join negamax worker thread #%d to the main thread.\n", thr);
             }
             
-            TranspositionTable_destroy(&thrTT[t]);
+            TransTable_destroy(&thrTT[thr]);
         }
     }
     
     // Look for immediate wins
-    for (t = 0; t < dropCount; ++t)
+    for (thr = 0; thr < dropCount; thr++)
     {
-        if (winOnFirst[t])
+        if (winOnFirst[thr])
         {
-            colN = dropList[t] & 0xf;
+            colN = dropList[thr] & 0xf;
             
-            switch (dropList[t] >> 4)
+            switch (dropList[thr] >> 4)
             {
             case 1:
                 _r1[colN].wdl = WIN_CHAR;
@@ -420,142 +398,139 @@ Result Negamax_solveInParallel(MakeSeven *_ms, const bool _VERBOSE, Result *_r1,
     return _bestResl ? *_bestResl : bestResl;
 }
 
-void Negamax_getMoveScores(MakeSeven *_ms, Result *_r1, Result *_r2, Result *_r3, Result *_best)
+void Negamax_results(Make7 *_m7, Result *_r1, Result *_r2, Result *_r3, Result *_best)
 {
-    uint8_t t, c, cEnd;
+    uint8_t tile, col, cEnd;
     bool mirror;
     
-    // Prevent null pointer deference
-    if (_r1 && _r2 && _r3)
+    // Check to see if the mirror image of the game state is the same
+    // If so, only search the left side of the grid
+    mirror = Make7_symmetrical(_m7);
+    cEnd = mirror ? 4 : MAKE7_SIZE;
+    
+    // Flush results with unknown values
+    for (tile = 0; tile < cEnd; tile++)
     {
-        // Check to see if the mirror image of the game state is the same
-        // If so, only search the left side of the grid
-        mirror = MakeSeven_symmetrical(_ms);
-        cEnd = mirror ? 4 : MAKESEVEN_SIZE;
+        _r1[tile].wdl = _r2[tile].wdl = _r3[tile].wdl = UNKNOWN_CHAR;
+    }
+    
+    // Loop through all possible drop moves and assign results
+    for (tile = 1; tile <= 3; tile++)
+    {
+        printf("%d ", tile);
         
-        // Flush results with unknown values
-        for (t = 0; t < cEnd; ++t)
+        for (col = 0; col < cEnd; col++)
         {
-            _r1[t].wdl = _r2[t].wdl = _r3[t].wdl = UNKNOWN_CHAR;
-        }
-        
-        // Loop through all possible drop moves and assign results
-        for (t = 1; t <= 3; ++t)
-        {
-            printf("%d ", t);
-            for (c = 0; c < cEnd; ++c)
-            {
 #ifdef __unix__
                 fflush(stdout);
 #endif                
-                if (MakeSeven_drop(_ms, t, c))
-                {
-                    
-                    // Look for immediate wins
-                    if (MakeSeven_tilesSumToSeven(_ms))
-                    {
-                        switch (t)
-                        {
-                        case 1:
-                            _r1[c].wdl = WIN_CHAR;
-                            _r1[c].dt7 = 0;
-                            
-                            if (mirror)
-                            {
-                                _r1[MAKESEVEN_SIZE_M1 - c].wdl = WIN_CHAR;
-                                _r1[MAKESEVEN_SIZE_M1 - c].dt7 = 0;
-                            }
-                            break;
-                        case 2:
-                            _r2[c].wdl = WIN_CHAR;
-                            _r2[c].dt7 = 0;
-                            
-                            if (mirror)
-                            {
-                                _r2[MAKESEVEN_SIZE_M1 - c].wdl = WIN_CHAR;
-                                _r2[MAKESEVEN_SIZE_M1 - c].dt7 = 0;
-                            }
-                            break;
-                        case 3:
-                            _r3[c].wdl = WIN_CHAR;
-                            _r3[c].dt7 = 0;
-                            
-                            if (mirror)
-                            {
-                                _r3[MAKESEVEN_SIZE_M1 - c].wdl = WIN_CHAR;
-                                _r3[MAKESEVEN_SIZE_M1 - c].dt7 = 0;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        TranspositionTable_destroy(&table);
-                        TranspositionTable_initialize(&table, table.size);
-                        
-                        // Solve for each move, as there is no win
-                        switch (t)
-                        {
-                        case 1:
-                            _r1[c] = Negamax_solve(_ms, &table, false);
-                            Result_increment(&_r1[c]);
-                            
-                            if (mirror)
-                            {
-                                _r1[MAKESEVEN_SIZE_M1 - c] = _r1[c];
-                            }
-                            break;
-                        case 2:
-                            _r2[c] = Negamax_solve(_ms, &table, false);
-                            Result_increment(&_r2[c]);
-                            
-                            if (mirror)
-                            {
-                                _r2[MAKESEVEN_SIZE_M1 - c] = _r2[c];
-                            }
-                            break;
-                        case 3:
-                            _r3[c] = Negamax_solve(_ms, &table, false);
-                            Result_increment(&_r3[c]);
-                            
-                            if (mirror)
-                            {
-                                _r3[MAKESEVEN_SIZE_M1 - c] = _r3[c];
-                            }
-                        }
-                    }
-                    MakeSeven_undrop(_ms);
-                }
+            if (Make7_drop(_m7, tile, col))
+            {
                 
-                // Print the results
-                switch (t)
+                // Look for immediate wins
+                if (Make7_tilesSumTo7(_m7))
                 {
-                case 1:
-                    Result_print(&_r1[c], _best);
-                    break;
-                case 2:
-                    Result_print(&_r2[c], _best);
-                    break;
-                case 3:
-                    Result_print(&_r3[c], _best);
+                    switch (tile)
+                    {
+                    case 1:
+                        _r1[col].wdl = WIN_CHAR;
+                        _r1[col].dt7 = 0;
+                        
+                        if (mirror)
+                        {
+                            _r1[MAKE7_SIZE_M1 - col].wdl = WIN_CHAR;
+                            _r1[MAKE7_SIZE_M1 - col].dt7 = 0;
+                        }
+                        break;
+                    case 2:
+                        _r2[col].wdl = WIN_CHAR;
+                        _r2[col].dt7 = 0;
+                        
+                        if (mirror)
+                        {
+                            _r2[MAKE7_SIZE_M1 - col].wdl = WIN_CHAR;
+                            _r2[MAKE7_SIZE_M1 - col].dt7 = 0;
+                        }
+                        break;
+                    case 3:
+                        _r3[col].wdl = WIN_CHAR;
+                        _r3[col].dt7 = 0;
+                        
+                        if (mirror)
+                        {
+                            _r3[MAKE7_SIZE_M1 - col].wdl = WIN_CHAR;
+                            _r3[MAKE7_SIZE_M1 - col].dt7 = 0;
+                        }
+                    }
                 }
+                else
+                {
+                    TransTable_destroy(&table);
+                    TransTable_initialize(&table, table.size);
+                    
+                    // Solve for each move, as there is no win
+                    switch (tile)
+                    {
+                    case 1:
+                        _r1[col] = Negamax_solve(_m7, &table, false);
+                        Result_increment(&_r1[col]);
+                        
+                        if (mirror)
+                        {
+                            _r1[MAKE7_SIZE_M1 - col] = _r1[col];
+                        }
+                        break;
+                    case 2:
+                        _r2[col] = Negamax_solve(_m7, &table, false);
+                        Result_increment(&_r2[col]);
+                        
+                        if (mirror)
+                        {
+                            _r2[MAKE7_SIZE_M1 - col] = _r2[col];
+                        }
+                        break;
+                    case 3:
+                        _r3[col] = Negamax_solve(_m7, &table, false);
+                        Result_increment(&_r3[col]);
+                        
+                        if (mirror)
+                        {
+                            _r3[MAKE7_SIZE_M1 - col] = _r3[col];
+                        }
+                    }
+                }
+                Make7_undrop(_m7);
             }
             
-            // Print it for the right half if the grid is symmetrical
-            for (; mirror && c < MAKESEVEN_SIZE; ++c)
+            // Print the results
+            switch (tile)
             {
-                switch (t)
-                {
-                case 1:
-                    Result_print(&_r1[c], _best);
-                    break;
-                case 2:
-                    Result_print(&_r2[c], _best);
-                    break;
-                case 3:
-                    Result_print(&_r3[c], _best);
-                }
+            case 1:
+                Result_print(&_r1[col], _best);
+                break;
+            case 2:
+                Result_print(&_r2[col], _best);
+                break;
+            case 3:
+                Result_print(&_r3[col], _best);
             }
-            puts("");
         }
+        
+        // Print it for the right half if the grid is symmetrical
+        for (; mirror && (col < MAKE7_SIZE); col++)
+        {
+            switch (tile)
+            {
+            case 1:
+                Result_print(&_r1[col], _best);
+                break;
+            case 2:
+                Result_print(&_r2[col], _best);
+                break;
+            case 3:
+                Result_print(&_r3[col], _best);
+            }
+        }
+        puts("");
     }
 }

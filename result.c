@@ -4,7 +4,7 @@
 
 #include "result.h"
 
-void Result_print(Result *_currR, Result *_bestR)
+void Result_print(const Result *_currR, const Result *_bestR)
 {
 #ifdef _WIN32 
     HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -12,8 +12,6 @@ void Result_print(Result *_currR, Result *_bestR)
     switch (_currR->wdl)
     {
     default:
-    case UNKNOWN_CHAR:
-    case '\0':
         printf(NONE_TEXT);
         break;
     case DRAW_CHAR:
@@ -142,157 +140,154 @@ void Result_increment(Result *_r)
     {
     case WIN_CHAR:
         _r->wdl = LOSS_CHAR;
-        ++_r->dt7;
+        _r->dt7++;
         break;
     case LOSS_CHAR:
         _r->wdl = WIN_CHAR;
-        ++_r->dt7;
+        _r->dt7++;
     }
 }
 
-Result Result_getBestResult(Result *_r1, Result *_r2, Result *_r3)
+Result Result_getBestResult(const Result *_r1, const Result *_r2, const Result *_r3)
 {
     unsigned i, score;
     Result best = { LOSS_CHAR, 0 };
     
-    if (_r1 && _r2 && _r3)
+    assert(_r1 && _r2 && _r3);
+    
+    for (i = score = 0; i < MAKE7_SIZE;)
     {
-        for (i = score = 0; i < MAKESEVEN_SIZE; ++i)
+        switch (score)
         {
-            switch (score)
+        case 0:
+            switch (_r1[i].wdl)
             {
-            case 0:
-                switch (_r1[i].wdl)
-                {
-                case LOSS_CHAR:
-                    if (_r1[i].dt7 > best.dt7)
-                    {
-                        best.dt7 = _r1[i].dt7;
-                    }
-                    break;
-                case DRAW_CHAR:
-                case WIN_CHAR:
-                    best = _r1[i];
-                    score = _r1[i].wdl == DRAW_CHAR ? 1 : 2;
-                    continue;
-                }
-                
-                switch (_r2[i].wdl)
-                {
-                case LOSS_CHAR:
-                    if (_r2[i].dt7 > best.dt7)
-                    {
-                        best.dt7 = _r2[i].dt7;
-                    }
-                    break;
-                case DRAW_CHAR:
-                case WIN_CHAR:
-                    best = _r2[i];
-                    score = _r2[i].wdl == DRAW_CHAR ? 1 : 2;
-                    continue;
-                }
-                
-                switch (_r3[i].wdl)
-                {
-                case LOSS_CHAR:
-                    if (_r3[i].dt7 > best.dt7)
-                    {
-                        best.dt7 = _r3[i].dt7;
-                    }
-                    break;
-                case DRAW_CHAR:
-                case WIN_CHAR:
-                    best = _r3[i];
-                    score = _r3[i].wdl == DRAW_CHAR ? 1 : 2;
-                    continue;
-                }
-                break;
-            case 1:
-                switch (_r1[i].wdl)
-                {
-                case WIN_CHAR:
-                    best = _r1[i];
-                    score = 2;
-                }
-                
-                switch (_r2[i].wdl)
-                {
-                case WIN_CHAR:
-                    best = _r2[i];
-                    score = 2;
-                }
-                
-                switch (_r3[i].wdl)
-                {
-                case WIN_CHAR:
-                    best = _r3[i];
-                    score = 2;
-                }
-                break;
-            case 2:
-                if ((_r1[i].wdl == WIN_CHAR) && (_r1[i].dt7 < best.dt7))
+            case LOSS_CHAR:
+                if (_r1[i].dt7 > best.dt7)
                 {
                     best.dt7 = _r1[i].dt7;
                 }
-                else if ((_r2[i].wdl == WIN_CHAR) && (_r2[i].dt7 < best.dt7))
+                break;
+            case DRAW_CHAR:
+            case WIN_CHAR:
+                best = _r1[i];
+                score = _r1[i].wdl == DRAW_CHAR ? 1 : 2;
+                continue;
+            }
+            
+            switch (_r2[i].wdl)
+            {
+            case LOSS_CHAR:
+                if (_r2[i].dt7 > best.dt7)
                 {
                     best.dt7 = _r2[i].dt7;
                 }
-                else if ((_r3[i].wdl == WIN_CHAR) && (_r3[i].dt7 < best.dt7))
+                break;
+            case DRAW_CHAR:
+            case WIN_CHAR:
+                best = _r2[i];
+                score = _r2[i].wdl == DRAW_CHAR ? 1 : 2;
+                continue;
+            }
+            
+            switch (_r3[i].wdl)
+            {
+            case LOSS_CHAR:
+                if (_r3[i].dt7 > best.dt7)
                 {
                     best.dt7 = _r3[i].dt7;
                 }
+                break;
+            case DRAW_CHAR:
+            case WIN_CHAR:
+                best = _r3[i];
+                score = _r3[i].wdl == DRAW_CHAR ? 1 : 2;
+                continue;
+            }
+            break;
+        case 1:
+            switch (_r1[i].wdl)
+            {
+            case WIN_CHAR:
+                best = _r1[i];
+                score = 2;
+            }
+            
+            switch (_r2[i].wdl)
+            {
+            case WIN_CHAR:
+                best = _r2[i];
+                score = 2;
+            }
+            
+            switch (_r3[i].wdl)
+            {
+            case WIN_CHAR:
+                best = _r3[i];
+                score = 2;
+            }
+            break;
+        case 2:
+            if ((_r1[i].wdl == WIN_CHAR) && (_r1[i].dt7 < best.dt7))
+            {
+                best.dt7 = _r1[i].dt7;
+            }
+            else if ((_r2[i].wdl == WIN_CHAR) && (_r2[i].dt7 < best.dt7))
+            {
+                best.dt7 = _r2[i].dt7;
+            }
+            else if ((_r3[i].wdl == WIN_CHAR) && (_r3[i].dt7 < best.dt7))
+            {
+                best.dt7 = _r3[i].dt7;
             }
         }
+        
+        i++;
     }
     
     return best;
 }
 
-uint8_t Result_getBestMove(Result *_r1, Result *_r2, Result *_r3)
+uint8_t Result_getBestMove(const Result *_r1, const Result *_r2, const Result *_r3)
 {
-    if (_r1 && _r2 && _r3)
+    unsigned long long randBest;
+    int i, j, bestIdx;
+    uint8_t bestTile[MAKE7_SIZE_X3], bestCol[MAKE7_SIZE_X3];
+    Result bestResult = Result_getBestResult(_r1, _r2, _r3);
+    bestIdx = 0;
+    
+    for (i = 0; i < 3; i++)
     {
-        unsigned long long randomBest;
-        int i, j, bestIndex;
-        uint8_t bestTile[21], bestColumn[21];
-        
-        Result bestResult = Result_getBestResult(_r1, _r2, _r3);
-        bestIndex = 0;
-        
-        for (i = 0; i < 3; ++i)
+        for (j = 0; j < MAKE7_SIZE; j++)
         {
-            for (j = 0; j < MAKESEVEN_SIZE; ++j)
+            switch (i)
             {
-                switch (i)
+            case 0:
+                if ((_r1[j].wdl != UNKNOWN_CHAR) && (bestResult.dt7 == _r1[j].dt7))
                 {
-                case 0:
-                    if ((_r1[j].wdl != UNKNOWN_CHAR) && (bestResult.dt7 == _r1[j].dt7))
-                    {
-                        bestTile[bestIndex] = 1;
-                        bestColumn[bestIndex++] = j;
-                    }
-                    break;
-                case 1:
-                    if ((_r2[j].wdl != UNKNOWN_CHAR) && (bestResult.dt7 == _r2[j].dt7))
-                    {
-                        bestTile[bestIndex] = 2;
-                        bestColumn[bestIndex++] = j;
-                    }
-                    break;
-                case 2:
-                    if ((_r3[j].wdl != UNKNOWN_CHAR) && (bestResult.dt7 == _r3[j].dt7))
-                    {
-                        bestTile[bestIndex] = 3;
-                        bestColumn[bestIndex++] = j;
-                    }
+                    bestTile[bestIdx] = 1;
+                    bestCol[bestIdx++] = j;
+                }
+                break;
+            case 1:
+                if ((_r2[j].wdl != UNKNOWN_CHAR) && (bestResult.dt7 == _r2[j].dt7))
+                {
+                    bestTile[bestIdx] = 2;
+                    bestCol[bestIdx++] = j;
+                }
+                break;
+            case 2:
+                if ((_r3[j].wdl != UNKNOWN_CHAR) && (bestResult.dt7 == _r3[j].dt7))
+                {
+                    bestTile[bestIdx] = 3;
+                    bestCol[bestIdx++] = j;
                 }
             }
         }
-        
-        randomBest = genrand64_int64() % bestIndex;
-        return (bestTile[randomBest] << 4) | (bestColumn[randomBest]);
     }
     
-    return 0;
+    assert(bestIdx);
+    randBest = genrand64_int64() % bestIdx;
+    
+    return (bestTile[randBest] << 4) | (bestCol[randBest]);
 }

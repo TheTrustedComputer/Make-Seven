@@ -23,7 +23,14 @@
 #ifndef NEGAMAX_H
 #define NEGAMAX_H
 
+// As of writing, MinGW does not have the threads.h header
+// Once supported, we will remove our custom thread header
+#if (defined(__MINGW64__) || defined(__MINGW32__))
+#include "mingw_threads.h"
+#else
 #include <threads.h>
+#endif
+
 #include <stdatomic.h>
 
 #include "make7.h"
@@ -40,10 +47,10 @@ enum NegamaxScore
 static atomic_ullong nodes;
 
 // Array to hold the move order; the score obtained from the transposition table
-static int moveOrder[MAKESEVEN_SIZE], tableScore;
+static int moveOrder[MAKE7_SIZE], tableScore;
 
-// Transposition table object
-static TranspositionTable table;
+// The transposition table object
+static TransTable table;
 
 // The number of worker threads to use
 static int thrCount;
@@ -51,26 +58,26 @@ static int thrCount;
 // Negamax worker thread's parameters
 typedef struct
 {
-    MakeSeven ms;
+    Make7 m7;
     atomic_int *running, *finishID;
     atomic_bool *idle, *solved;
     mtx_t *startMtx, *finishMtx;
     cnd_t *startCnd, *finishCnd;
-    TranspositionTable *table;
+    TransTable *table;
     Result *results, result;
     int id;
     uint8_t move;
     bool verbose;
 }
-NegamaxThread;
+NegamaxArgs;
 
 // Negamax
 void Negamax_setColumnMoveOrder(void);                                                                  // Set up the move order for the columns
-bool Negamax_checkForSeven(const MakeSeven*);                                                           // Helper function to check for a "Make 7"		
-int Negamax_search(MakeSeven*, TranspositionTable*, int, int, int);                                                          // Do a negamax search on this position
+bool Negamax_checkForSeven(const Make7*);                                                               // Helper function to check for a "Make 7"		
+int Negamax_search(Make7*, TransTable*, const int, int, int);                                           // Do a negamax search on this position
 int Negamax_worker(void*);                                                                              // Negamax worker thread's main function
-Result Negamax_solve(MakeSeven*, TranspositionTable*, const bool);                                                           // Solve this game state and return the result
-Result Negamax_solveInParallel(MakeSeven*, const bool, Result*, Result*, Result*, Result*, uint8_t*);   // Solve it using multiple threads
-void Negamax_getMoveScores(MakeSeven*, Result*, Result*, Result*, Result*);                             // Get and print the results of all moves
+Result Negamax_solve(Make7*, TransTable*, const bool);                                                  // Solve this game state and return the result
+Result Negamax_solve_parallel(Make7*, const bool, Result*, Result*, Result*, Result*, uint8_t*);        // Solve it using multiple threads
+void Negamax_results(Make7*, Result*, Result*, Result*, Result*);                                       // Get and print the results of all moves
 
 #endif /* NEGAMAX_H */

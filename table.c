@@ -4,9 +4,9 @@
 
 #include "table.h"
 
-bool TranspositionTable_prime(const unsigned _N)
+bool TransTable_prime(const size_t _N)
 {
-    unsigned i;
+    size_t i;
     
     // Zero and one are not considered prime numbers
     if (!_N || (_N == 1))
@@ -38,11 +38,12 @@ bool TranspositionTable_prime(const unsigned _N)
     return true;
 }
 
-unsigned TranspositionTable_prevprime(unsigned _n)
+size_t TransTable_prevprime(size_t _n)
 {
     _n = (_n & 1) ? _n - 2 : _n - 1;
     
-    while (!TranspositionTable_prime(_n))
+    // Subtract by 2 until it is prime
+    while (!TransTable_prime(_n))
     {
         _n -= 2;
     }
@@ -50,48 +51,45 @@ unsigned TranspositionTable_prevprime(unsigned _n)
     return _n;
 }
 
-bool TranspositionTable_initialize(TranspositionTable *_tt, unsigned _initSize)
+bool TransTable_initialize(TransTable *_tt, const size_t _INIT_SIZE)
 {
-    if (_initSize > 3)
+    size_t entryAlloc;
+    bool success = false;
+    
+    if (_INIT_SIZE > 3)
     {
-        _tt->size = TranspositionTable_prevprime(_initSize);
+        _tt->size = TransTable_prevprime(_INIT_SIZE);
+        entryAlloc = sizeof(*_tt->entry) * _tt->size;
         
-        if (!(_tt->tableEntry = malloc(sizeof(*_tt->tableEntry) * _tt->size)))
+        if ((_tt->entry = malloc(entryAlloc)))
         {
-            _tt->size = 0;
-            return false;
+            //memset(_tt->entry, 0, entryAlloc);
+            success = true;
         }
-        
-        return true;
     }
     
-    return false;
+    return success;
 }
 
-void TranspositionTable_destroy(TranspositionTable* _tt)
+void TransTable_destroy(TransTable *_tt)
 {
-    free(_tt->tableEntry);
-    _tt->tableEntry = NULL;
+    free(_tt->entry);
+    _tt->entry = NULL;
 }
 
-void TranspositionTable_storeVal(TranspositionTable *_tt, const uint64_t _B_KEY, const uint64_t _KEY2, const uint64_t _KEY3, const int _VAL)
+void TransTable_store(TransTable *_tt, const uint64_t _G_KEY, const uint64_t _KEY2, const uint64_t _KEY3, const int _VAL)
 {
-    unsigned i = _B_KEY % _tt->size;
+    size_t i = _G_KEY % _tt->size;
     
-    _tt->tableEntry[i].boardKey = _B_KEY;
-    _tt->tableEntry[i].twoTileKey = _KEY2;
-    _tt->tableEntry[i].threeTileKey = _KEY3;
-    _tt->tableEntry[i].value = _VAL;
+    _tt->entry[i].gridKey = _G_KEY;
+    _tt->entry[i].twoKey = _KEY2;
+    _tt->entry[i].threeKey = _KEY3;
+    _tt->entry[i].value = _VAL;
 }
 
-int TranspositionTable_loadVal(TranspositionTable *_tt, const uint64_t _B_KEY, const uint64_t _KEY2, const uint64_t _KEY3)
+int TransTable_load(TransTable *_tt, const uint64_t _G_KEY, const uint64_t _KEY2, const uint64_t _KEY3)
 {
-    unsigned i = _B_KEY % _tt->size;
+    size_t i = _G_KEY % _tt->size;
     
-    if ((_tt->tableEntry[i].boardKey == _B_KEY) && (_tt->tableEntry[i].twoTileKey == _KEY2) && (_tt->tableEntry[i].threeTileKey == _KEY3))
-    {
-        return _tt->tableEntry[i].value;
-    }
-    
-    return TT_UNKNOWN;
+    return (_tt->entry[i].gridKey == _G_KEY) && (_tt->entry[i].twoKey == _KEY2) && (_tt->entry[i].threeKey == _KEY3) ? _tt->entry[i].value : TT_UNKNOWN;
 }

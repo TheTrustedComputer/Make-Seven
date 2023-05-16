@@ -20,29 +20,29 @@
 // A single entry to the transposition table
 typedef struct
 {
-    uint64_t boardKey, twoTileKey, threeTileKey;
+    uint64_t gridKey, twoKey, threeKey;
     int value;
 }
-TT_TableEntry;
+TT_Entry;
 
 // The transposition table itself
 typedef struct
 {
-    TT_TableEntry *tableEntry;
-    unsigned size;
+    TT_Entry *entry;
+    size_t size;
 }
-TranspositionTable;
+TransTable;
 
 // Prime number testing algorithms to minimize hash collisions
-bool TranspositionTable_prime(const unsigned);                                                                      // Tests if a number is prime
-unsigned TranspositionTable_prevprime(unsigned);                                                                    // Finds the largest prime number less than the input
+bool TransTable_prime(const size_t);                                                                    // Tests if a number is prime
+size_t TransTable_prevprime(size_t);                                                                    // Finds the largest prime number less than the input
 
 // Memory allocation
-bool TranspositionTable_initialize(TranspositionTable*, unsigned);                                                  // Initializes the transposition table
-void TranspositionTable_destroy(TranspositionTable*);                                                               // Release the memory allocated to it   
+bool TransTable_initialize(TransTable*, const size_t);                                                  // Initializes the transposition table
+void TransTable_destroy(TransTable*);                                                                   // Release the memory allocated to it   
 
 // Operations on transposition tables
-void TranspositionTable_storeVal(TranspositionTable*, const uint64_t, const uint64_t, const uint64_t, const int);   // Stores a key-value pair into the table
-int TranspositionTable_loadVal(TranspositionTable*, const uint64_t, const uint64_t, const uint64_t);                // Loads a value from the table given a key
+void TransTable_store(TransTable*, const uint64_t, const uint64_t, const uint64_t, const int);          // Stores a key-value pair into the table
+int TransTable_load(TransTable*, const uint64_t, const uint64_t, const uint64_t);                       // Loads a value from the table given a key
 
 #endif /* TABLE_H */

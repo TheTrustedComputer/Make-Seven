@@ -7,30 +7,29 @@
 /*!
  *  @param _init    The MCTS node to initialize.
  *  @param _ancest  The ancestor or parent node.
- *  @param _descend The descendants or child nodes.
  *  @param _MOVE    The move that led to this node.
  *  @param _DEPTH   The tree depth of this node.
  */
-void MCTSNode_initialize(MCTSNode *_init, MCTSNode *_ancest, MCTSNode *_descends, const uint8_t _MOVE)
+void MCTSNode_initialize(MCTSNode *_init, MCTSNode *_ancest, const uint8_t _MOVE)
 {
     _init->ancestor = _ancest;
-    _init->descendants = _descends;
+    _init->descendant = NULL;
     _init->points = _init->visits = _init->count = 0;
     _init->move = _MOVE;
 }
 
 void MCTSNode_destroy(MCTSNode *_destroyer)
 {
-    uint8_t n;
+    uint8_t node;
     
-    if (_destroyer->descendants)
+    if (_destroyer->count)
     {
-        for (n = 0; n < _destroyer->count; ++n)
+        for (node = 0; node < _destroyer->count; node++)
         {
-            MCTSNode_destroy(&_destroyer->descendants[n]);
+            MCTSNode_destroy(&_destroyer->descendant[node]);
         }
         
-        free(_destroyer->descendants);
+        free(_destroyer->descendant);
     }
 }
 
@@ -41,14 +40,14 @@ void MCTSNode_print(const MCTSNode *_PRINT)
 
 void MCTSNode_printAll(const MCTSNode *_PRINTALL, const int _DEPTH)
 {
-    uint8_t n;
+    uint8_t node;
     
     // Print all tree nodes
     if (_PRINTALL->count)
     {
-        for (n = 0; n < _PRINTALL->count; ++n)
+        for (node = 0; node < _PRINTALL->count; node++)
         {
-            MCTSNode_printAll(_PRINTALL->descendants, _DEPTH + 1);
+            MCTSNode_printAll(_PRINTALL->descendant, _DEPTH + 1);
         }
     }
     else
@@ -61,59 +60,55 @@ void MCTSNode_printAll(const MCTSNode *_PRINTALL, const int _DEPTH)
 void MCTSNode_avgPoints(const MCTSNode *_PTS)
 {
     long double avg;
-    uint8_t tile, col, n;
+    uint8_t tile, col, node;
     
-    if (_PTS)
+    for (node = 0; _PTS && (node < _PTS->count); node++)
     {
-        for (n = 0; n < _PTS->count; ++n)
-        {
-            avg = (long double)(_PTS->descendants[n].points) / _PTS->descendants[n].visits;
-            tile = _PTS->descendants[n].move >> 4;
-            col = _PTS->descendants[n].move & 0xf;
-            printf("%d%c %.2Lf %lld %lld\n", tile, col + 'A', avg, _PTS->descendants[n].points, _PTS->descendants[n].visits);
-        }
+        avg = (long double)(_PTS->descendant[node].points) / _PTS->descendant[node].visits;
+        tile = _PTS->descendant[node].move >> 4;
+        col = _PTS->descendant[node].move & 0xf;
+        printf("%d%c %.2Lf %lld %lld\n", tile, col + 'A', avg, _PTS->descendant[node].points, _PTS->descendant[node].visits);
     }
 }
 
 long double MCTS_uct(const MCTSNode *_UCT)
 {
-    return _UCT->visits ? ((long double)(_UCT->points) / _UCT->visits) + (MCTS_UCT_C * sqrtl(logl((long double)(_UCT->ancestor->visits) / _UCT->visits))) : INFINITY;
+    return ((long double)(_UCT->points) / _UCT->visits) + (MCTS_UCT_C * sqrtl(logl((long double)(_UCT->ancestor->visits) / _UCT->visits)));
 }
 
 /*!
  *  @param _selector The MCTS node to select.
- *  @param _ms       The Make 7 game state to update.
+ *  @param _m7       The Make 7 game state to update.
  *  @return          The selected MCTS node.
  */
-MCTSNode *MCTS_select(MCTSNode *_selector, MakeSeven *_ms)
+MCTSNode *MCTS_select(MCTSNode *_selector, Make7 *_m7)
 {
-    MCTSNode *selected;
     long double bestUCT, currUCT;
-    uint8_t n;
+    MCTSNode *selected;
+    uint8_t node;
     
-    // Check if this node has descendants
-    if (_selector->count)
+    // As long as this node has descendants
+    while (_selector->count)
     {
-        for (bestUCT = -INFINITY, n = 0; n < _selector->count; ++n)
+        for (bestUCT = -INFINITY, node = 0; node < _selector->count; node++)
         {
             // Check unvisited descendant nodes; select it for expansion
-            if (!_selector->descendants[n].visits)
+            if (!_selector->descendant[node].visits)
             {
                 return _selector;
             }
             
             // Select the descendant with the highest UCT value
-            if ((currUCT = MCTS_uct(&_selector->descendants[n])) > bestUCT)
+            if ((currUCT = MCTS_uct(&_selector->descendant[node])) > bestUCT)
             {
                 bestUCT = currUCT;
-                selected = &_selector->descendants[n];
+                selected = &_selector->descendant[node];
             }
         }
         
         // Update the game state to select the next node
-        MakeSeven_drop(_ms, selected->move >> 4, selected->move & 0xf);
-        
-        return MCTS_select(selected, _ms);
+        Make7_drop(_m7, selected->move >> 4, selected->move & 0xf);
+        _selector = selected;
     }
     
     // This node has no descendants; expand it
@@ -122,31 +117,31 @@ MCTSNode *MCTS_select(MCTSNode *_selector, MakeSeven *_ms)
 
 /*!
  *  @param _expander The MCTS node to expand.
- *  @param _MS       The Make 7 game state to generate moves from.
+ *  @param _M7       The Make 7 game state to generate moves from.
  *  @return          True if the expansion was successful, false otherwise.
  */
-bool MCTS_expand(MCTSNode *_expander, const MakeSeven *_MS)
+bool MCTS_expand(MCTSNode *_expander, const Make7 *_M7)
 {
     MCTSNode expandee;
-    uint8_t dropList[MAKESEVEN_SIZE_X3], n;
+    uint8_t drops[MAKE7_SIZE_X3], node;
     
     // Check if the game is not over; do not expand if it is or already expanded
-    if (!(MakeSeven_gameOver(_MS) || _expander->count))
+    if (!(_expander->count || Make7_gameOver(_M7)))
     {
         // Generate the list of possible moves
-        MakeSeven_generate(_MS, dropList, &_expander->count);
+        Make7_generate(_M7, drops, &_expander->count);
         
         // Reserve memory for descendant nodes
-        if (!(_expander->descendants = malloc(sizeof(*_expander->descendants) * _expander->count)))
+        if (!(_expander->descendant = malloc(sizeof(*_expander->descendant) * _expander->count)))
         {
             return false;
         }
         
         // Expand the nodes and add them to the list of descendants
-        for (n = 0; n < _expander->count; ++n)
+        for (node = 0; node < _expander->count; node++)
         {
-            MCTSNode_initialize(&expandee, _expander, NULL, dropList[n]);
-            _expander->descendants[n] = expandee;
+            MCTSNode_initialize(&expandee, _expander, drops[node]);
+            _expander->descendant[node] = expandee;
         }
     }
     
@@ -159,27 +154,28 @@ bool MCTS_expand(MCTSNode *_expander, const MakeSeven *_MS)
  *  @param _SCORE   The score to reward the simulation with.
  *  @return         The reward for the simulation.
  */
-long long MCTS_simulate(MakeSeven *_simulMS, const uint8_t _TURN)
+signed long long MCTS_simulate(Make7 *_simulMS, const uint8_t _TURN)
 {
     unsigned long long randMove;
-    uint8_t simulMoves[MAKESEVEN_SIZE_X3], simulCount;
+    uint8_t simulMoves[MAKE7_SIZE_X3], simulCount;
     
     // Play until the game is over
     for (;;)
     {
         // Get the list of possible drops to simulate
-        MakeSeven_generate(_simulMS, simulMoves, &simulCount);
+        Make7_generate(_simulMS, simulMoves, &simulCount);
         
         // If there are moves, select one at random and play that move; otherwise, return no reward to indicate a draw
         if (simulCount)
         {
             randMove = genrand64_int64() % simulCount;
-            MakeSeven_drop(_simulMS, simulMoves[randMove] >> 4, simulMoves[randMove] & 0xf);
+            Make7_drop(_simulMS, simulMoves[randMove] >> 4, simulMoves[randMove] & 0xf);
             
             // If there is a win or a loss, return the score depending on the player who started the simulation
-            if (MakeSeven_tilesSumToSeven(_simulMS))
+            if (Make7_tilesSumTo7(_simulMS))
             {
-                return _TURN == (_simulMS->plyNum & 1) ? 1 : -1;
+                // ^ is the same as != on a single bit
+                return _TURN ^ (_simulMS->plyNum & 1) ? -1 : 1;
             }
         }
         else
@@ -193,11 +189,11 @@ long long MCTS_simulate(MakeSeven *_simulMS, const uint8_t _TURN)
  *  @param _backpropagator The MCTS node to backpropagate from.
  *  @param _simulResult    The result of the simulation.
  */
-void MCTS_backpropagate(MCTSNode *_backpropagator, long long _simulResult)
+void MCTS_backpropagate(MCTSNode *_backpropagator, signed long long _simulResult)
 {
     while (_backpropagator)
     {
-        ++_backpropagator->visits;
+        _backpropagator->visits++;
         _backpropagator->points += _simulResult;
         _simulResult = -_simulResult;
         _backpropagator = _backpropagator->ancestor;
@@ -211,16 +207,16 @@ void MCTS_backpropagate(MCTSNode *_backpropagator, long long _simulResult)
 MCTSResult MCTS_best(const MCTSNode *_root)
 {
     MCTSNode best = *_root;
-    long long currVisits, bestVisits = -1;
-    uint8_t n;
+    unsigned long long currVisits, bestVisits = 0;
+    uint8_t node;
     
     // Choose the node with the highest visits; it generally performs better than highest mean points per visit
-    for (n = 0; n < _root->count; ++n)
+    for (node = 0; node < _root->count; node++)
     {
-        if ((currVisits = _root->descendants[n].visits) > bestVisits)
+        if ((currVisits = _root->descendant[node].visits) > bestVisits)
         {
             bestVisits = currVisits;
-            best = _root->descendants[n];
+            best = _root->descendant[node];
         }
     }
     
@@ -228,13 +224,13 @@ MCTSResult MCTS_best(const MCTSNode *_root)
 }
 
 /*!
- *  @param _MS       The Make 7 game state to search for a move.
+ *  @param _M7       The Make 7 game state to search for a move.
  *  @param _WIN_HND  The handle to the console window (compilation for Windows only).
  *  @param _PARALLEL Use multithreading to speed up the search.
  *  @param _OUTPUT   Whether to output the search progress to the console.
  *  @return          The best move found by Monte Carlo tree search.
  */
-uint8_t MCTS_search(const MakeSeven *_MS, const void *_WIN_HND, const bool _OUTPUT)
+uint8_t MCTS_search(const Make7 *_M7, void *_WIN_HND, const bool _OUTPUT)
 {
     
 #if defined(_WIN64) || defined(_WIN32)
@@ -247,44 +243,43 @@ uint8_t MCTS_search(const MakeSeven *_MS, const void *_WIN_HND, const bool _OUTP
     time_t progress;
     double elapsed;
     long long i, secs, sims;
-    long double oneTile[MAKESEVEN_SIZE], twoTile[MAKESEVEN_SIZE], threeTile[MAKESEVEN_SIZE];
+    long double oneTile[MAKE7_SIZE], twoTile[MAKE7_SIZE], threeTile[MAKE7_SIZE];
     uint8_t tile, col;
     
-    MakeSeven mctsMS = *_MS;
+    Make7 mctsM7 = *_M7;
     
     // Catch SIGINT to stop the search
     signal(SIGINT, MCTS_stop);
-    MCTSNode_initialize(&root, NULL, NULL, 0);
+    MCTSNode_initialize(&root, NULL, 0);
     
-    for (progress = time(NULL), i = secs = 0; atomic_load(&runMCTS); ++i)
+    for (progress = time(NULL), i = secs = 0; atomic_load(&runMCTS); i++)
     {
         // Selection
-        leaf = MCTS_select(&root, &mctsMS);
+        leaf = MCTS_select(&root, &mctsM7);
         
         // Expansion
-        if (!MCTS_expand(leaf, &mctsMS))
+        if (!MCTS_expand(leaf, &mctsM7))
         {
             // On no more memory, restore the game state and stop
-            mctsMS = *_MS;
+            mctsM7 = *_M7;
             break;
         }
         
         // Pick a random move to simulate and update the game state
         if (leaf->count)
         {
-            leaf = &leaf->descendants[genrand64_int64() % leaf->count];
-            MakeSeven_drop(&mctsMS, leaf->move >> 4, leaf->move & 0xf);
+            leaf = &leaf->descendant[genrand64_int64() % leaf->count];
+            Make7_drop(&mctsM7, leaf->move >> 4, leaf->move & 0xf);
         }
         
         // Check immediate wins and losses, rewarding them with higher scores
-        sims = MakeSeven_tilesSumToSeven(&mctsMS) ? (MAKESEVEN_AREA_P2 - mctsMS.plyNum) >> 1 : MCTS_simulate(&mctsMS, mctsMS.plyNum & 1);
-        
+        sims = Make7_tilesSumTo7(&mctsM7) ? MAKE7_AREA_P1 - mctsM7.plyNum : MCTS_simulate(&mctsM7, mctsM7.plyNum & 1);
         
         // Simulation and backpropagation
         MCTS_backpropagate(leaf, sims);
         
         // Reset the game state for the next loop
-        mctsMS = *_MS;
+        mctsM7 = *_M7;
         
         // Compute best move found and print the progress
         if ((elapsed = difftime(time(NULL), progress)) >= 1)
@@ -308,27 +303,27 @@ uint8_t MCTS_search(const MakeSeven *_MS, const void *_WIN_HND, const bool _OUTP
     if (_OUTPUT)
     {
         // Initialize the array of points for invalid moves
-        for (i = 0; i < MAKESEVEN_SIZE; ++i)
+        for (i = 0; i < MAKE7_SIZE; i++)
         {
             oneTile[i] = twoTile[i] = threeTile[i] = MCTS_INVALID;
         } 
         
         // Copy the points to the array
-        for (i = 0; i < root.count; ++i)
+        for (i = 0; i < root.count; i++)
         {
-            tile = root.descendants[i].move >> 4;
-            col = root.descendants[i].move & 0xf;
+            tile = root.descendant[i].move >> 4;
+            col = root.descendant[i].move & 0xf;
             
             switch (tile)
             {
             case 1:
-                oneTile[col] = (long double)(root.descendants[i].points) / root.descendants[i].visits;
+                oneTile[col] = (long double)(root.descendant[i].points) / root.descendant[i].visits;
                 break;
             case 2:
-                twoTile[col] = (long double)(root.descendants[i].points) / root.descendants[i].visits;
+                twoTile[col] = (long double)(root.descendant[i].points) / root.descendant[i].visits;
                 break;
             case 3:
-                threeTile[col] = (long double)(root.descendants[i].points) / root.descendants[i].visits;
+                threeTile[col] = (long double)(root.descendant[i].points) / root.descendant[i].visits;
             }
         }
         
@@ -347,7 +342,7 @@ uint8_t MCTS_search(const MakeSeven *_MS, const void *_WIN_HND, const bool _OUTP
     return result.bestMove;
 }
 
-void MCTS_progress(const MCTSResult *_RESULT, const void *_WIN_HND, const unsigned long long _ITERS, const unsigned long long _SECS)
+void MCTS_progress(const MCTSResult *_RESULT, void *_WIN_HND, const unsigned long long _ITERS, const unsigned long long _SECS)
 {
 #if defined(_WIN64) || defined(_WIN32)
     HANDLE *winTerm = _WIN_HND;
@@ -400,24 +395,24 @@ void MCTS_progress(const MCTSResult *_RESULT, const void *_WIN_HND, const unsign
     
 }
 
-void MCTS_pointStats(const void *_WIN_HND, const long double *_1T_PTS, const long double *_2T_PTS, const long double *_3T_PTS)
+void MCTS_pointStats(void *_WIN_HND, const long double *_1T_PTS, const long double *_2T_PTS, const long double *_3T_PTS)
 {
-    int t, c;
+    int tile, col;
     
 #if defined(_WIN64) || defined(_WIN32)
     HANDLE *winTerm = _WIN_HND;
 #endif
     
-    for (t = 1; t <= 3; ++t)
+    for (tile = 1; tile <= 3; tile++)
     {
-        printf("%d ", t);
+        printf("%d ", tile);
         
-        for (c = 0; c < MAKESEVEN_SIZE; ++c)
+        for (col = 0; col < MAKE7_SIZE; col++)
         {
-            switch (t)
+            switch (tile)
             {
             case 1:         
-                if ((_1T_PTS[c] != MCTS_INVALID) && (_1T_PTS[c] <= -1.0l))
+                if ((_1T_PTS[col] != MCTS_INVALID) && (_1T_PTS[col] <= -1.0l))
                 {
                     
 #if defined(_WIN64) || defined(_WIN32)
@@ -427,7 +422,7 @@ void MCTS_pointStats(const void *_WIN_HND, const long double *_1T_PTS, const lon
 #endif
                     
                 }
-                else if ((_1T_PTS[c] > -1.0l) && (_1T_PTS[c] < 1.0l))
+                else if ((_1T_PTS[col] > -1.0l) && (_1T_PTS[col] < 1.0l))
                 {
                     
 #if defined(_WIN64) || defined(_WIN32)
@@ -437,7 +432,7 @@ void MCTS_pointStats(const void *_WIN_HND, const long double *_1T_PTS, const lon
 #endif
                     
                 }
-                else if (_1T_PTS[c] >= 1.0l)
+                else if (_1T_PTS[col] >= 1.0l)
                 {
                     
 #if defined(_WIN64) || defined(_WIN32)
@@ -449,14 +444,14 @@ void MCTS_pointStats(const void *_WIN_HND, const long double *_1T_PTS, const lon
                 }
                 
 #if defined(_WIN64) || defined(_WIN32)
-                (_1T_PTS[c] == MCTS_INVALID) ? printf("-- ") : printf("%.2Lf ", _1T_PTS[c]);
+                (_1T_PTS[col] == MCTS_INVALID) ? printf("-- ") : printf("%.2Lf ", _1T_PTS[col]);
 #else
-                (_1T_PTS[c] == MCTS_INVALID) ? printf("-- ") : printf("%.2Lf\e[0m ", _1T_PTS[c]);
+                (_1T_PTS[col] == MCTS_INVALID) ? printf("-- ") : printf("%.2Lf\e[0m ", _1T_PTS[col]);
 #endif
                 
                 break;
             case 2:
-                if ((_2T_PTS[c] != MCTS_INVALID) && (_2T_PTS[c] <= -1.0l))
+                if ((_2T_PTS[col] != MCTS_INVALID) && (_2T_PTS[col] <= -1.0l))
                 {
                     
 #if defined(_WIN64) || defined(_WIN32)
@@ -466,7 +461,7 @@ void MCTS_pointStats(const void *_WIN_HND, const long double *_1T_PTS, const lon
 #endif
                     
                 }
-                else if ((_2T_PTS[c] > -1.0l) && (_2T_PTS[c] < 1.0l))
+                else if ((_2T_PTS[col] > -1.0l) && (_2T_PTS[col] < 1.0l))
                 {
                     
 #if defined(_WIN64) || defined(_WIN32)
@@ -476,7 +471,7 @@ void MCTS_pointStats(const void *_WIN_HND, const long double *_1T_PTS, const lon
 #endif
                     
                 }
-                else if (_2T_PTS[c] >= 1.0l)
+                else if (_2T_PTS[col] >= 1.0l)
                 {
                     
 #if defined(_WIN64) || defined(_WIN32)
@@ -488,14 +483,14 @@ void MCTS_pointStats(const void *_WIN_HND, const long double *_1T_PTS, const lon
                 }
             
 #if defined(_WIN64) || defined(_WIN32)
-                (_2T_PTS[c] == MCTS_INVALID) ? printf("-- ") : printf("%.2Lf ", _2T_PTS[c]);
+                (_2T_PTS[col] == MCTS_INVALID) ? printf("-- ") : printf("%.2Lf ", _2T_PTS[col]);
 #else
-                (_2T_PTS[c] == MCTS_INVALID) ? printf("-- ") : printf("%.2Lf\e[0m ", _2T_PTS[c]);
+                (_2T_PTS[col] == MCTS_INVALID) ? printf("-- ") : printf("%.2Lf\e[0m ", _2T_PTS[col]);
 #endif
                 
                 break;
             case 3:
-                if ((_3T_PTS[c] != MCTS_INVALID) && (_3T_PTS[c] <= -1.0l))
+                if ((_3T_PTS[col] != MCTS_INVALID) && (_3T_PTS[col] <= -1.0l))
                 {
                     
 #if defined(_WIN64) || defined(_WIN32)
@@ -505,7 +500,7 @@ void MCTS_pointStats(const void *_WIN_HND, const long double *_1T_PTS, const lon
 #endif
                     
                 }
-                else if ((_3T_PTS[c] > -1.0l) && (_3T_PTS[c] < 1.0l))
+                else if ((_3T_PTS[col] > -1.0l) && (_3T_PTS[col] < 1.0l))
                 {
                     
 #if defined(_WIN64) || defined(_WIN32)
@@ -515,7 +510,7 @@ void MCTS_pointStats(const void *_WIN_HND, const long double *_1T_PTS, const lon
 #endif
                     
                 }
-                else if (_3T_PTS[c] >= 1.0l)
+                else if (_3T_PTS[col] >= 1.0l)
                 {
                     
 #if defined(_WIN64) || defined(_WIN32)
@@ -527,9 +522,9 @@ void MCTS_pointStats(const void *_WIN_HND, const long double *_1T_PTS, const lon
                 }
             
 #if defined(_WIN64) || defined(_WIN32)
-                (_3T_PTS[c] == MCTS_INVALID) ? printf("-- ") : printf("%.2Lf ", _3T_PTS[c]);
+                (_3T_PTS[col] == MCTS_INVALID) ? printf("-- ") : printf("%.2Lf ", _3T_PTS[col]);
 #else
-                (_3T_PTS[c] == MCTS_INVALID) ? printf("-- ") : printf("%.2Lf\e[0m ", _3T_PTS[c]);
+                (_3T_PTS[col] == MCTS_INVALID) ? printf("-- ") : printf("%.2Lf\e[0m ", _3T_PTS[col]);
 #endif
             }    
         }
@@ -542,11 +537,11 @@ void MCTS_pointStats(const void *_WIN_HND, const long double *_1T_PTS, const lon
     }
 }
 
-int MCTS_rootWorker(void *_mctsWorkArgs)
+int MCTS_rootWorker(void *_args)
 {
-    MCTSRootThread *mrt = _mctsWorkArgs;
+    MCTSRootThread *mrt = _args;
     MCTSNode *leaf;
-    long long localSims;
+    long long localSim;
     
     // Reseed the RNG with a unique seed for each thread
     init_genrand64(time(NULL) + clock() + mrt->id);
@@ -555,10 +550,10 @@ int MCTS_rootWorker(void *_mctsWorkArgs)
     while (atomic_load(&runMCTS))
     {
         // Select
-        leaf = MCTS_select(&mrt->localRoot, &mrt->copyMS);
+        leaf = MCTS_select(&mrt->localRoot, &mrt->copyM7);
         
         // Expand
-        if (!MCTS_expand(leaf, &mrt->copyMS))
+        if (!MCTS_expand(leaf, &mrt->copyM7))
         {
             // On insufficient memory, stop the thread
             atomic_store(&runMCTS, false);
@@ -568,20 +563,20 @@ int MCTS_rootWorker(void *_mctsWorkArgs)
         // Choose a random descendant and make that move
         if (leaf->count)
         {
-            leaf = &leaf->descendants[genrand64_int64() % leaf->count];
-            MakeSeven_drop(&mrt->copyMS, leaf->move >> 4, leaf->move & 0xf);
+            leaf = &leaf->descendant[genrand64_int64() % leaf->count];
+            Make7_drop(&mrt->copyM7, leaf->move >> 4, leaf->move & 0xf);
         }
         
         // Simulate and backpropagate
-        localSims = MakeSeven_tilesSumToSeven(&mrt->copyMS) ? (MAKESEVEN_AREA_P2 - mrt->copyMS.plyNum) >> 1 : MCTS_simulate(&mrt->copyMS, mrt->copyMS.plyNum & 1);
-        MCTS_backpropagate(leaf, localSims);
+        localSim = Make7_tilesSumTo7(&mrt->copyM7) ? MAKE7_AREA_P1 - mrt->copyM7.plyNum : MCTS_simulate(&mrt->copyM7, mrt->copyM7.plyNum & 1);
+        MCTS_backpropagate(leaf, localSim);
         
         // Reset the local game state for another iteration
-        mrt->copyMS = *mrt->originMS;
+        mrt->copyM7 = *mrt->originM7;
         
         // Update the global root, locking it from other threads
         mtx_lock(mrt->gRootLock);
-        MCTSNode_update(mrt->globalRoot, mrt->localRoot.descendants, mrt->totalGMoves);
+        MCTSNode_update(mrt->globalRoot, mrt->localRoot.descendant, mrt->totalGMoves);
         mtx_unlock(mrt->gRootLock);
         
         // Increment the number of iterations
@@ -593,45 +588,16 @@ int MCTS_rootWorker(void *_mctsWorkArgs)
 
 void MCTSNode_update(MCTSNode *_global, MCTSNode *_local, const uint8_t _G_MOVES)
 {
-    uint8_t n;
+    uint8_t node;
     
-    for (n = 0; n < _G_MOVES; ++n)
+    for (node = 0; node < _G_MOVES; node++)
     {
-        _global[n].visits += _local[n].visits;
-        _global[n].points += _local[n].points;
-        
-        /*
-        // Detect an overflow of the visits counter
-        if (_global[n].visits < 0)
-        {
-            // Set the run flag to false to stop all threads
-            atomic_store(&runMCTS, false);
-        }
-        else
-        {
-             _global[n].visits += _local[n].visits;
-        }
-        
-        // Points overflow
-        if ((_global[n].points >= 0) && (_local[n].points > (INT64_MAX - _global[n].points)))
-        {
-            atomic_store(&runMCTS, false);
-        }
-        
-        // Points underflow
-        else if ((_global[n].points < 0) && (_local[n].points < (INT64_MIN - _global[n].points)))
-        {
-            atomic_store(&runMCTS, false);
-        }
-        else
-        {
-            _global[n].points += _local[n].points;
-        }
-        */
+        _global[node].visits += _local[node].visits;
+        _global[node].points += _local[node].points;
     }
 }
 
-uint8_t MCTS_rootParallel(MakeSeven *_MS, const void *_WIN_HND, const bool _OUTPUT)
+uint8_t MCTS_rootParallel(Make7 *_M7, void *_WIN_HND, const bool _OUTPUT)
 {
 #if defined(_WIN64) || defined(_WIN32)
     HANDLE *winTerm = _WIN_HND;
@@ -645,16 +611,15 @@ uint8_t MCTS_rootParallel(MakeSeven *_MS, const void *_WIN_HND, const bool _OUTP
     MCTSNode thrLRoots[thrCount], bestRoot;
     MCTSResult thrBestRes;
     mtx_t rootLock;
-    long double gOneTile[MAKESEVEN_SIZE], gTwoTile[MAKESEVEN_SIZE], gThreeTile[MAKESEVEN_SIZE];
+    long double gOneTile[MAKE7_SIZE], gTwoTile[MAKE7_SIZE], gThreeTile[MAKE7_SIZE];
     atomic_ullong i;
-    unsigned long long secs;
-    long long currVis, bestVis;
+    unsigned long long secs, currVis, bestVis;
     struct timespec printTime;
-    int t, thrRet, tile, col;
-    uint8_t mvCount, list[MAKESEVEN_SIZE_X3];
+    int thr, thrRet, tile, col;
+    uint8_t mvCount, list[MAKE7_SIZE_X3];
     
     signal(SIGINT, MCTS_stop);
-    MakeSeven_generate(_MS, list, &mvCount);
+    Make7_generate(_M7, list, &mvCount);
     atomic_init(&i, 0);
     printTime.tv_sec = 1;
     printTime.tv_nsec = 0;
@@ -663,9 +628,9 @@ uint8_t MCTS_rootParallel(MakeSeven *_MS, const void *_WIN_HND, const bool _OUTP
     
     MCTSNode thrGRoot[mvCount];
     
-    for (t = 0; t < mvCount; ++t)
+    for (thr = 0; thr < mvCount; thr++)
     {
-        MCTSNode_initialize(&thrGRoot[t], NULL, NULL, list[t]);
+        MCTSNode_initialize(&thrGRoot[thr], NULL, list[thr]);
     }
     
     if (mtx_init(&rootLock, mtx_plain) != thrd_success)
@@ -675,29 +640,29 @@ uint8_t MCTS_rootParallel(MakeSeven *_MS, const void *_WIN_HND, const bool _OUTP
     }
     
     // Initialize thread arguments and create the threads
-    for (t = 0; t < thrCount; ++t)
+    for (thr = 0; thr < thrCount; thr++)
     {
-        MCTSNode_initialize(&thrLRoots[t], NULL, NULL, 0);
+        MCTSNode_initialize(&thrLRoots[thr], NULL, 0);
         
-        thrArgs[t] = (MCTSRootThread)
+        thrArgs[thr] = (MCTSRootThread)
         {
-            .copyMS = *_MS,
-            .originMS = _MS,
-            .localRoot = thrLRoots[t],
+            .copyM7 = *_M7,
+            .originM7 = _M7,
+            .localRoot = thrLRoots[thr],
             .globalRoot = thrGRoot,
             .gRootLock = &rootLock,
             .iters = &i,
-            .id = t,
+            .id = thr,
             .totalGMoves = mvCount
         };
         
-        switch (thrd_create(&mctsThreads[t], MCTS_rootWorker, &thrArgs[t]))
+        switch (thrd_create(&mctsThreads[thr], MCTS_rootWorker, &thrArgs[thr]))
         {
         case thrd_nomem:
-            fprintf(stderr, "Ran out of memory while creating thread #%d.\n", t);
+            fprintf(stderr, "Ran out of memory while creating thread #%d.\n", thr);
             exit(EXIT_FAILURE);
         case thrd_error:
-            fprintf(stderr, "Could not create thread #%d for root parallelization.\n", t);
+            fprintf(stderr, "Could not create thread #%d for root parallelization.\n", thr);
             exit(EXIT_FAILURE);
         default:
             break;
@@ -712,12 +677,12 @@ uint8_t MCTS_rootParallel(MakeSeven *_MS, const void *_WIN_HND, const bool _OUTP
         bestRoot = thrGRoot[0];
         bestVis = currVis = bestRoot.visits;
         
-        for (t = 1; t < thrCount; ++t)
+        for (thr = 1; thr < thrCount; thr++)
         {
-            if ((currVis = thrGRoot[t].visits) > bestVis)
+            if ((currVis = thrGRoot[thr].visits) > bestVis)
             {
                 bestVis = currVis;
-                bestRoot = thrGRoot[t];
+                bestRoot = thrGRoot[thr];
             }
         }
         
@@ -734,43 +699,43 @@ uint8_t MCTS_rootParallel(MakeSeven *_MS, const void *_WIN_HND, const bool _OUTP
     }
         
     // Join the threads after completing the search
-    for (t = 0; t < thrCount; ++t)
+    for (thr = 0; thr < thrCount; thr++)
     {
-        switch (thrd_join(mctsThreads[t], &thrRet))
+        switch (thrd_join(mctsThreads[thr], &thrRet))
         {
         case thrd_error:
-            fprintf(stderr, "Could not join thread #%d after completing Monte Carlo tree search.\n", t);
+            fprintf(stderr, "Could not join thread #%d after completing Monte Carlo tree search.\n", thr);
             exit(EXIT_FAILURE);
         default:
             break;
         }
         
-        MCTSNode_destroy(&thrLRoots[t]);
+        MCTSNode_destroy(&thrLRoots[thr]);
     }
     
     if (_OUTPUT)
     {
         // Same logic as the serial version to print the statistics
-        for (t = 0; t < MAKESEVEN_SIZE; ++t)
+        for (thr = 0; thr < MAKE7_SIZE; thr++)
         {
-            gOneTile[t] = gTwoTile[t] = gThreeTile[t] = MCTS_INVALID;
+            gOneTile[thr] = gTwoTile[thr] = gThreeTile[thr] = MCTS_INVALID;
         }
         
-        for (t = 0; t < mvCount; ++t)
+        for (thr = 0; thr < mvCount; thr++)
         {
-            tile = thrGRoot[t].move >> 4;
-            col = thrGRoot[t].move & 0xf;
+            tile = thrGRoot[thr].move >> 4;
+            col = thrGRoot[thr].move & 0xf;
             
             switch (tile)
             {
             case 1:
-                gOneTile[col] = (long double)(thrGRoot[t].points) / thrGRoot[t].visits;
+                gOneTile[col] = (long double)(thrGRoot[thr].points) / thrGRoot[thr].visits;
                 break;
             case 2:
-                gTwoTile[col] = (long double)(thrGRoot[t].points) / thrGRoot[t].visits;
+                gTwoTile[col] = (long double)(thrGRoot[thr].points) / thrGRoot[thr].visits;
                 break;
             case 3:
-                gThreeTile[col] = (long double)(thrGRoot[t].points) / thrGRoot[t].visits;
+                gThreeTile[col] = (long double)(thrGRoot[thr].points) / thrGRoot[thr].visits;
             }
         }
         
