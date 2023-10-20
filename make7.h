@@ -33,7 +33,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// Make Seven's board dimensions is a fixed seven-by-seven square to take into account of the one tiles.
+// Make 7's board dimensions is a fixed seven-by-seven square to take into account of the one tiles.
 #define MAKE7_SIZE 7
 #define MAKE7_SIZE_M1 6
 #define MAKE7_SIZE_P1 8
@@ -43,7 +43,7 @@
 #define MAKE7_AREA_P1 50
 #define MAKE7_AREA_X2 98
 
-// Make Seven static bitmaps; it works pretty much more or less the same as any Connect Four implementation.
+// Make 7 static bitmaps; it works pretty much more or less the same as any Connect Four implementation.
 #define MAKE7_ALL 0x7f7f7f7f7f7f7full
 #define MAKE7_BOT 0x1010101010101ull
 #define MAKE7_TOP 0x80808080808080ull
@@ -88,6 +88,9 @@ static const uint64_t NDIAG_BITMASK_TABLE[55] = {0x1ull, 0x102ull, 0x10204ull, 0
                                                  0x102040810ull, 0x10204081020ull, 0x1020408102040ull, 0x2040810204000ull, 0x4081020400000ull, 0x8102040000000ull, 0x10204000000000ull, 0x0ull,
                                                  0x10204081020ull, 0x1020408102040ull, 0x2040810204000ull, 0x4081020400000ull, 0x8102040000000ull, 0x10204000000000ull, 0x20400000000000ull, 0x0ull,
                                                  0x1020408102040ull, 0x2040810204000ull, 0x4081020400000ull, 0x8102040000000ull, 0x10204000000000ull, 0x20400000000000ull, 0x40000000000000ull};
+
+// Direction tables to check for adjacent tiles
+static const uint8_t DIRECTION_TABLE[4] = {1, MAKE7_SIZE_P1, MAKE7_SIZE, MAKE7_SIZE_P2};
 
 // The core Make 7 structure in which all movements and calculations are performed here.
 typedef struct

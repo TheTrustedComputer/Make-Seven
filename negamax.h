@@ -23,8 +23,8 @@
 #ifndef NEGAMAX_H
 #define NEGAMAX_H
 
-// As of writing, MinGW does not have the threads.h header
-// Once supported, we will remove our custom thread header
+// As of writing, MinGW does not natively support C11 threads
+// Once supported, we will remove this custom thread implementation
 #if (defined(__MINGW64__) || defined(__MINGW32__))
 #include "mingw_threads.h"
 #else

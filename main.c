@@ -2,8 +2,8 @@
     Copyright (C) 2020- TheTrustedComputer
     
     The driver function of the Make 7 game solver.
-    It reads command-line arguments, sets flags, inputs a move sequence, and solves it.
-    It repeats indefinitely until the user terminates the program.
+    It reads command-line arguments, sets flags, inputs move sequences, and solves positions.
+    This repeats indefinitely until the user terminates the program.
 */
 
 #define _POSIX_C_SOURCE 200809 // clock_gettime()
@@ -33,6 +33,12 @@
 #include "negamax.c"
 #include "mcts.c"
 
+static inline void stopPGO(int UNUSED)
+{
+    (void)(UNUSED);
+    exit(0);
+}
+
 int main(int argc, char **argv)
 {
     /* Variable declarations */
@@ -52,7 +58,7 @@ int main(int argc, char **argv)
     uint8_t best, mctsMove, totalMoves, movesList[MAKE7_SIZE_X3], m;
     
     // Character input; move input from user; interactive mode type
-    char input, humanInput[3], type, argSeq[MAKE7_AREA_X2];
+    char input, humanInput[3], type, argSeq[MAKE7_AREA_X2 + 1];
     
     // Statistics on solving time, and number of positions evaluated
     struct timespec parallelStart, parallelEnd;
@@ -60,46 +66,51 @@ int main(int argc, char **argv)
     double sec, npsec;
     
     // Flags for the main loop
-    bool over, running, notFixedTable, monteCarloTS, interactive, parallel, humanMove, invalidMove;
+    bool over, running, notFixedTable, monteCarloTS, interactive, parallel, humanMove, invalidMove, pgo;
     
     // The final calculated table size, used when setting up the transposition table for the first time
-    int res, finalTTSize;
+    size_t finalTTSize;
     
-    // Lower the process priority for other processes
+    // Pointer to iterate the results to check for correctness
+    int res;
+    
+    // Lower our priority for other processes
 #if defined(_WIN64) || defined(_WIN32)
-    SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS);
+    SetPriorityClass(GetCurrentProcess(), IDLE_PRIORITY_CLASS);
 #elifdef __linux__
-    setpriority(PRIO_PROCESS, getpid(), 10);
+    setpriority(PRIO_PROCESS, getpid(), 19);
 #endif
     
     // Read command-line arguments and set flags accordingly
     {
-        int option;
-        bool argTableNotDone, argMCTSNotDone, argInteractNotDone, argParallelNotDone, argSwapNotDone;
+        int opt;
+        bool argTableNotDone, argMCTSNotDone, argInteractNotDone, argParallelNotDone, argSwapNotDone, argPGONotDone;
         
         // Default flag values
         monteCarloTS = false;
         interactive = false;
         parallel = false;
+        pgo = false;
         g_swapColors = false;
         argTableNotDone = true;
         argMCTSNotDone = true;
         argInteractNotDone = true;
         argParallelNotDone = true;
         argSwapNotDone = true;
+        argPGONotDone = true;
         notFixedTable = true;
         finalTTSize = 1;
         argSeq[0] = '\0';
         
         if (argc >= 2)
         {
-            for (option = 1; option < argc; option++)
+            for (opt = 1; opt < argc; opt++)
             {
                 // Tokenize the arguments: check for switches
-                if (argv[option][0] == '-')
+                if (argv[opt][0] == '-')
                 {
                     // Help
-                    if (!((strcmp(argv[option], "-h") && strcmp(argv[option], "-?") && strcmp(argv[option], "--help"))))
+                    if (!(strcmp(argv[opt], "-h") && strcmp(argv[opt], "-?") && strcmp(argv[opt], "--help")))
                     {
                         Make7_helpMessage(argv[0]);
                         return 0;
@@ -109,66 +120,61 @@ int main(int argc, char **argv)
                     else
                     {
                         // Interactivity
-                        if (argInteractNotDone && !((strcmp(argv[option], "-i") && strcmp(argv[option], "--interactive"))))
+                        if (argInteractNotDone && !(strcmp(argv[opt], "-i") && strcmp(argv[opt], "--interactive")))
                         {
                             interactive = true;
                             argInteractNotDone = notFixedTable = false;
                         }
                         
                         // Monte Carlo tree search
-                        else if (argMCTSNotDone && !((strcmp(argv[option], "-m") && strcmp(argv[option], "--mcts"))))
+                        else if (argMCTSNotDone && !(strcmp(argv[opt], "-m") && strcmp(argv[opt], "--mcts")))
                         {
                             monteCarloTS = true;
                             argMCTSNotDone = false;
                         }
                         
                         // Parallelization
-                        else if (argParallelNotDone && !((strcmp(argv[option], "-p") && strcmp(argv[option], "--parallel"))))
+                        else if (argParallelNotDone && !(strcmp(argv[opt], "-p") && strcmp(argv[opt], "--parallel")))
                         {
                             parallel = true;
                             argParallelNotDone = false;
                         }
                         
                         // Tile color swapping
-                        else if (argSwapNotDone && !((strcmp(argv[option], "-s") && strcmp(argv[option], "--swap-colors"))))
+                        else if (argSwapNotDone && !(strcmp(argv[opt], "-s") && strcmp(argv[opt], "--swap-colors")))
                         {
                             g_swapColors = true;
                             argSwapNotDone = false;
                         }
                         
                         // Transposition table size
-                        else if (argTableNotDone && !((strcmp(argv[option], "-t") && strcmp(argv[option], "--table"))))
+                        else if (argTableNotDone && !(strcmp(argv[opt], "-t") && strcmp(argv[opt], "--table-size")))
                         {
-                            if (argv[++option])
-                            {
-                                finalTTSize = atoi(argv[option]);
-                            }
-                            else
-                            {
-                                fprintf(stderr, "Please specify a positive transposition table size in gigabytes.\n");
-                                return 1;
-                            }
-                            
+                            opt++;
+                            finalTTSize = argv[opt] ? atoi(argv[opt]) : 1;
                             argTableNotDone = notFixedTable = false;
+                        }
+                        
+                        // Profile guided optimization
+                        else if (argPGONotDone && !(strcmp(argv[opt], "-g") && strcmp(argv[opt], "--guided")))
+                        {
+                            pgo = true;
+                            argPGONotDone = false;
                         }
                         
                         // Unknown switch
                         else
                         {
-                            fprintf(stderr, "Could not understand the switch \"%s\". Please type \"-h\" for help.\n", argv[option]);
+                            fprintf(stderr, "Could not understand the switch \"%s\". Please type \"-h\" for help.\n", argv[opt]);
                             return 1;
                         }
                     }
                 }
                 
                 // Move sequence
-                else if ((argv[option][0] >= '1' && argv[option][0] <= '3') && (((argv[option][1] >= 'A') && (argv[option][1] <= 'G')) || ((argv[option][1] >= 'a') && (argv[option][1] <= 'g'))))
+                else if ((argv[opt][0] >= '1' && argv[opt][0] <= '3') && (((argv[opt][1] >= 'A') && (argv[opt][1] <= 'G')) || ((argv[opt][1] >= 'a') && (argv[opt][1] <= 'g'))))
                 {
-#ifdef _MSC_VER
-                    strncpy_s(argSeq, sizeof(argSeq) / sizeof(argSeq[0]), argv[option], sizeof(argSeq) / sizeof(argSeq[0]));
-#else
-                    strncpy(argSeq, argv[option], sizeof(argSeq) / sizeof(argSeq[0]));
-#endif
+                    snprintf(argSeq, sizeof(argSeq), "%s", argv[opt]);
                 }
             }
         }
@@ -179,77 +185,75 @@ int main(int argc, char **argv)
         if (notFixedTable)
         {
 #ifdef __linux__ // Linux: get host memory size using sysinfo; set transposition table size to the host memory
-            {
-                // Structure for system information
-                struct sysinfo sysSpecs;
-                unsigned long gigs, power2;
+            
+            // Structure for system information
+            struct sysinfo sysSpecs;
+            unsigned long gigs, power2;
+            
+            if (sysinfo(&sysSpecs) != -1) // Request system information
+            {                
+                // Fetch the host memory size in gigabytes
+                gigs = sysSpecs.totalram / 1073741824;
                 
-                if (sysinfo(&sysSpecs) != -1) // Request system information
-                {                
-                    // Fetch half of host memory size in gigabytes
-                    gigs = sysSpecs.totalram / 2147483648ul;
-                    
-                    // Round up to the nearest power of two that is less than or equal to the system memory size
-                    for (power2 = 1; power2 < gigs; power2 <<= 1);
-                    
-                    // Keep asking for memory but use half of that memory if unable to get it reserved
-                    while (power2 && !TransTable_initialize(&table, (finalTTSize = TT_HASHSIZE * power2)))
-                    {
-                        power2 >>= 1;
-                    }
-                    
-                    if (!table.entry)
-                    {
-                        fprintf(stderr, "Could not initialize the transposition table size to the installed memory size.\n");
-                        exit(EXIT_FAILURE);
-                    }
-                }
-                else // Use a fallback if cannot get system information3
-                {
-                    TransTable_initialize(&table, (finalTTSize = TT_HASHSIZE));
-                }
-            }
-#elif defined(_WIN64) || defined(_WIN32) // Windows: get host memory size using GlobalMemoryStatusEx; this works with virtual machines unlike GetPhysicallyInstalledSystemMemory
-            {
-                MEMORYSTATUSEX memory;
-                unsigned long long kilos, upower2;
-                long long gigs, power2;
-                bool success0, success1;
-                memory.dwLength = sizeof(memory);
-                
-                kilos = 0ull;
-                
-                // Returns in kilobytes, divide by 1048576 to get gigabytes
-                success0 = GetPhysicallyInstalledSystemMemory(&kilos);
-                kilos /= 1048576;
-                
-                // Round up to nearest power of two
-                for (upower2 = 1; upower2 < kilos; upower2 <<= 1);
-                
-                gigs = 0l;
-                
-                // A non-zero return value means it's okay; if cannot fetch installed memory size
-                success1 = GlobalMemoryStatusEx(&memory);
-                
-                // Divide by 1024^3 to get gigabytes as it is in bytes
-                
-                gigs = memory.ullTotalPhys / 1073741824;
-                
+                // Round up to the nearest power of two that is less than or equal to the system memory size
                 for (power2 = 1; power2 < gigs; power2 <<= 1);
                 
-                // If either succeeded, initialize transposition table with half of host memory
-                if (success0)
+                // Keep asking for memory but use half of that memory if unable to get it reserved
+                while (power2 && !TransTable_initialize(&table, (finalTTSize = TT_HASHSIZE * power2)))
                 {
-                    for (upower2 >>= 1; upower2 && !TransTable_initialize(&table, (finalTTSize = TT_HASHSIZE * upower2)); upower2 >>= 1);
+                    power2 >>= 1;
                 }
-                else if (success1)
+                
+                if (!table.entry)
                 {
-                    for (power2 >>= 1; upower2 && !TransTable_initialize(&table, (finalTTSize = TT_HASHSIZE * power2)); power2 >>= 1);
+                    fprintf(stderr, "Could not initialize the transposition table size to the installed memory size.\n");
+                    exit(EXIT_FAILURE);
                 }
-                else // When neither of the above worked, use a gigabyte
-                {
-                    TransTable_initialize(&table, (finalTTSize = TT_HASHSIZE));
-                }
+            }
+            else // Use a fallback if cannot get system information3
+            {
+                TransTable_initialize(&table, (finalTTSize = TT_HASHSIZE));
+            }
+            
+#elif defined(_WIN64) || defined(_WIN32) // Windows: get host memory size using GlobalMemoryStatusEx; this works with virtual machines unlike GetPhysicallyInstalledSystemMemory
+            
+            MEMORYSTATUSEX memory;
+            unsigned long long kilos, upower2;
+            long long gigs, power2;
+            bool success0, success1;
+            memory.dwLength = sizeof(memory);
+            
+            kilos = 0ull;
+            
+            // Returns in kilobytes, divide by 1048576 to get gigabytes
+            success0 = GetPhysicallyInstalledSystemMemory(&kilos);
+            kilos /= 1048576;
+            
+            // Round up to nearest power of two
+            for (upower2 = 1; upower2 < kilos; upower2 <<= 1);
+            
+            gigs = 0l;
+            
+            // A non-zero return value means it's okay; zero if cannot fetch installed memory size
+            success1 = GlobalMemoryStatusEx(&memory);
+            
+            // Divide by 1024^3 to get gigabytes as it is in bytes
+            gigs = memory.ullTotalPhys / 1073741824;
+            
+            for (power2 = 1; power2 < gigs; power2 <<= 1);
+            
+            // If either succeeded, initialize transposition table with half of host memory
+            if (success0)
+            {
+                for (upower2 >>= 1; upower2 && !TransTable_initialize(&table, (finalTTSize = TT_HASHSIZE * upower2)); upower2 >>= 1);
+            }
+            else if (success1)
+            {
+                for (power2 >>= 1; upower2 && !TransTable_initialize(&table, (finalTTSize = TT_HASHSIZE * power2)); power2 >>= 1);
+            }
+            else // When neither of the above worked, use a gigabyte
+            {
+                TransTable_initialize(&table, (finalTTSize = TT_HASHSIZE));
             }
 #else
             // Default to one gigabyte on all other platforms
@@ -430,22 +434,32 @@ int main(int argc, char **argv)
         {       
             over = false;
             best = 0;
-             
-            // Get move sequence from command line arguments
-            if (argSeq[0])
+            
+            // Are we running to generate a PGO (profile guided optimization) profile?
+            if (pgo)
             {
-                running = false;
-                Make7_sequence(&ms, argSeq);
+                // Disable parallelization, as it can slow down the search significantly
+                running = parallel = false;
+                signal(SIGINT, stopPGO);
             }
             else
             {
-                // Get sequence from user input
-                while ((input = getchar()) != EOF)
+                // Get move sequence from command line arguments
+                if (argSeq[0])
                 {
-                    if (!Make7_getUserInput(&ms, input))
+                    running = false;
+                    Make7_sequence(&ms, argSeq);
+                }
+                else
+                {
+                    // Get sequence from user input
+                    while ((input = getchar()) != EOF)
                     {
-                        if (input == '\n') {
-                            break;
+                        if (!Make7_getUserInput(&ms, input))
+                        {
+                            if (input == '\n') {
+                                break;
+                            }
                         }
                     }
                 }
@@ -603,7 +617,7 @@ int main(int argc, char **argv)
                     TransTable_destroy(&table);
                     
                     if (running)
-                    { 
+                    {
                         TransTable_initialize(&table, finalTTSize);
                     }
                 }

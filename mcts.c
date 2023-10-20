@@ -4,13 +4,20 @@
 
 #include "mcts.h"
 
+// Toggle the run flag to stop after receiving SIGINT
+static inline void MCTS_stop(int UNUSED)
+{
+    (void)(UNUSED); // To suppress the unused parameter warning
+    atomic_store(&runMCTS, false);
+}
+
 /*!
  *  @param _init    The MCTS node to initialize.
  *  @param _ancest  The ancestor or parent node.
  *  @param _MOVE    The move that led to this node.
  *  @param _DEPTH   The tree depth of this node.
  */
-void MCTSNode_initialize(MCTSNode *_init, MCTSNode *_ancest, const uint8_t _MOVE)
+void MCTSNode_initialize(MCTSNode* restrict _init, MCTSNode* restrict _ancest, const uint8_t _MOVE)
 {
     _init->ancestor = _ancest;
     _init->descendant = NULL;
@@ -18,27 +25,27 @@ void MCTSNode_initialize(MCTSNode *_init, MCTSNode *_ancest, const uint8_t _MOVE
     _init->move = _MOVE;
 }
 
-void MCTSNode_destroy(MCTSNode *_destroyer)
+void MCTSNode_destroy(MCTSNode* restrict _dest)
 {
     uint8_t node;
     
-    if (_destroyer->count)
+    if (_dest->count)
     {
-        for (node = 0; node < _destroyer->count; node++)
+        for (node = 0; node < _dest->count; node++)
         {
-            MCTSNode_destroy(&_destroyer->descendant[node]);
+            MCTSNode_destroy(&_dest->descendant[node]);
         }
         
-        free(_destroyer->descendant);
+        free(_dest->descendant);
     }
 }
 
-void MCTSNode_print(const MCTSNode *_PRINT)
+void MCTSNode_printNode(const MCTSNode* restrict _PRINT)
 {
     printf("\e[1m%d%c\e[0m: %lld %lld %d %.8Lf\n", _PRINT->move >> 4, 'A' + (_PRINT->move & 0xf), _PRINT->points, _PRINT->visits, _PRINT->count, MCTS_uct(_PRINT));
 }
 
-void MCTSNode_printAll(const MCTSNode *_PRINTALL, const int _DEPTH)
+void MCTSNode_printAll(const MCTSNode* restrict _PRINTALL, const int _DEPTH)
 {
     uint8_t node;
     
@@ -53,11 +60,11 @@ void MCTSNode_printAll(const MCTSNode *_PRINTALL, const int _DEPTH)
     else
     {
         printf("Depth %d: ", _DEPTH);
-        MCTSNode_print(_PRINTALL);
+        MCTSNode_printNode(_PRINTALL);
     }
 }
 
-void MCTSNode_avgPoints(const MCTSNode *_PTS)
+void MCTSNode_avgPoints(const MCTSNode* restrict _PTS)
 {
     long double avg;
     uint8_t tile, col, node;
@@ -71,9 +78,9 @@ void MCTSNode_avgPoints(const MCTSNode *_PTS)
     }
 }
 
-long double MCTS_uct(const MCTSNode *_UCT)
+long double MCTS_uct(const MCTSNode* restrict _UCT)
 {
-    return ((long double)(_UCT->points) / _UCT->visits) + (MCTS_UCT_C * sqrtl(logl((long double)(_UCT->ancestor->visits) / _UCT->visits)));
+    return ((long double)(_UCT->points) / _UCT->visits) + (/* MCTS_UCT_C * */ sqrtl(logl((long double)(_UCT->ancestor->visits) / _UCT->visits)));
 }
 
 /*!
@@ -81,7 +88,7 @@ long double MCTS_uct(const MCTSNode *_UCT)
  *  @param _m7       The Make 7 game state to update.
  *  @return          The selected MCTS node.
  */
-MCTSNode *MCTS_select(MCTSNode *_selector, Make7 *_m7)
+MCTSNode *MCTS_select(MCTSNode* restrict _selector, Make7* restrict _m7)
 {
     long double bestUCT, currUCT;
     MCTSNode *selected;
@@ -120,7 +127,7 @@ MCTSNode *MCTS_select(MCTSNode *_selector, Make7 *_m7)
  *  @param _M7       The Make 7 game state to generate moves from.
  *  @return          True if the expansion was successful, false otherwise.
  */
-bool MCTS_expand(MCTSNode *_expander, const Make7 *_M7)
+bool MCTS_expand(MCTSNode* restrict _expander, const Make7* restrict _M7)
 {
     MCTSNode expandee;
     uint8_t drops[MAKE7_SIZE_X3], node;
@@ -154,7 +161,7 @@ bool MCTS_expand(MCTSNode *_expander, const Make7 *_M7)
  *  @param _SCORE   The score to reward the simulation with.
  *  @return         The reward for the simulation.
  */
-signed long long MCTS_simulate(Make7 *_simulMS, const uint8_t _TURN)
+signed long long MCTS_simulate(Make7* restrict _simulMS, const uint8_t _TURN)
 {
     unsigned long long randMove;
     uint8_t simulMoves[MAKE7_SIZE_X3], simulCount;
@@ -189,7 +196,7 @@ signed long long MCTS_simulate(Make7 *_simulMS, const uint8_t _TURN)
  *  @param _backpropagator The MCTS node to backpropagate from.
  *  @param _simulResult    The result of the simulation.
  */
-void MCTS_backpropagate(MCTSNode *_backpropagator, signed long long _simulResult)
+void MCTS_backpropagate(MCTSNode* restrict _backpropagator, signed long long _simulResult)
 {
     while (_backpropagator)
     {
@@ -204,37 +211,38 @@ void MCTS_backpropagate(MCTSNode *_backpropagator, signed long long _simulResult
  *  @param _root The root MCTS node to search from.
  *  @return      The move with the highest visits.
  */
-MCTSResult MCTS_best(const MCTSNode *_root)
+MCTSResult MCTS_best(MCTSNode* restrict _root)
 {
-    MCTSNode best = *_root;
-    unsigned long long currVisits, bestVisits = 0;
+    MCTSNode *best = &_root->descendant[0];
+    unsigned long long currVisits, bestVisits = best->visits;
     uint8_t node;
     
     // Choose the node with the highest visits; it generally performs better than highest mean points per visit
-    for (node = 0; node < _root->count; node++)
+    for (node = 1; node < _root->count; node++)
     {
         if ((currVisits = _root->descendant[node].visits) > bestVisits)
         {
             bestVisits = currVisits;
-            best = _root->descendant[node];
+            best = &_root->descendant[node];
         }
     }
     
-    return (MCTSResult) {(long double)(best.points) / best.visits, best.move};
+    return (MCTSResult) {(long double)(best->points) / best->visits, best->move};
 }
 
 /*!
  *  @param _M7       The Make 7 game state to search for a move.
  *  @param _WIN_HND  The handle to the console window (compilation for Windows only).
- *  @param _PARALLEL Use multithreading to speed up the search.
  *  @param _OUTPUT   Whether to output the search progress to the console.
  *  @return          The best move found by Monte Carlo tree search.
  */
-uint8_t MCTS_search(const Make7 *_M7, void *_WIN_HND, const bool _OUTPUT)
+uint8_t MCTS_search(const Make7* restrict _M7, void* restrict _WIN_HND, const bool _OUTPUT)
 {
     
 #if defined(_WIN64) || defined(_WIN32)
     HANDLE *winTerm = _WIN_HND;
+#else
+    (void)(_WIN_HND);
 #endif
     
     static MCTSNode root, *leaf;
@@ -306,7 +314,7 @@ uint8_t MCTS_search(const Make7 *_M7, void *_WIN_HND, const bool _OUTPUT)
         for (i = 0; i < MAKE7_SIZE; i++)
         {
             oneTile[i] = twoTile[i] = threeTile[i] = MCTS_INVALID;
-        } 
+        }
         
         // Copy the points to the array
         for (i = 0; i < root.count; i++)
@@ -342,10 +350,12 @@ uint8_t MCTS_search(const Make7 *_M7, void *_WIN_HND, const bool _OUTPUT)
     return result.bestMove;
 }
 
-void MCTS_progress(const MCTSResult *_RESULT, void *_WIN_HND, const unsigned long long _ITERS, const unsigned long long _SECS)
+void MCTS_progress(const MCTSResult* restrict _RESULT, void* restrict _WIN_HND, const unsigned long long _ITERS, const unsigned long long _SECS)
 {
 #if defined(_WIN64) || defined(_WIN32)
     HANDLE *winTerm = _WIN_HND;
+#else
+    (void)(_WIN_HND);
 #endif
     
     printf("\r");
@@ -395,12 +405,14 @@ void MCTS_progress(const MCTSResult *_RESULT, void *_WIN_HND, const unsigned lon
     
 }
 
-void MCTS_pointStats(void *_WIN_HND, const long double *_1T_PTS, const long double *_2T_PTS, const long double *_3T_PTS)
+void MCTS_pointStats(void* restrict _WIN_HND, const long double* restrict _1T_PTS, const long double* restrict _2T_PTS, const long double* restrict _3T_PTS)
 {
     int tile, col;
     
 #if defined(_WIN64) || defined(_WIN32)
     HANDLE *winTerm = _WIN_HND;
+#else
+    (void)(_WIN_HND);
 #endif
     
     for (tile = 1; tile <= 3; tile++)
@@ -526,7 +538,7 @@ void MCTS_pointStats(void *_WIN_HND, const long double *_1T_PTS, const long doub
 #else
                 (_3T_PTS[col] == MCTS_INVALID) ? printf("-- ") : printf("%.2Lf\e[0m ", _3T_PTS[col]);
 #endif
-            }    
+            }
         }
         
 #if defined(_WIN64) || defined(_WIN32)
@@ -586,7 +598,7 @@ int MCTS_rootWorker(void *_args)
     return 0;
 }
 
-void MCTSNode_update(MCTSNode *_global, MCTSNode *_local, const uint8_t _G_MOVES)
+void MCTSNode_update(MCTSNode* restrict _global, MCTSNode* restrict _local, const uint8_t _G_MOVES)
 {
     uint8_t node;
     
@@ -597,18 +609,19 @@ void MCTSNode_update(MCTSNode *_global, MCTSNode *_local, const uint8_t _G_MOVES
     }
 }
 
-uint8_t MCTS_rootParallel(Make7 *_M7, void *_WIN_HND, const bool _OUTPUT)
+uint8_t MCTS_rootParallel(Make7* restrict _M7, void* restrict _WIN_HND, const bool _OUTPUT)
 {
 #if defined(_WIN64) || defined(_WIN32)
     HANDLE *winTerm = _WIN_HND;
     thrCount = GetMaximumProcessorCount(ALL_PROCESSOR_GROUPS);
 #elifdef __unix__
+    (void)(_WIN_HND);
     thrCount = sysconf(_SC_NPROCESSORS_ONLN);
 #endif
     
     thrd_t mctsThreads[thrCount];
     MCTSRootThread thrArgs[thrCount];
-    MCTSNode thrLRoots[thrCount], bestRoot;
+    MCTSNode thrLRoots[thrCount], *bestRoot;
     MCTSResult thrBestRes;
     mtx_t rootLock;
     long double gOneTile[MAKE7_SIZE], gTwoTile[MAKE7_SIZE], gThreeTile[MAKE7_SIZE];
@@ -674,21 +687,21 @@ uint8_t MCTS_rootParallel(Make7 *_M7, void *_WIN_HND, const bool _OUTPUT)
     {
         thrd_sleep(&printTime, NULL);
         mtx_lock(&rootLock);
-        bestRoot = thrGRoot[0];
-        bestVis = currVis = bestRoot.visits;
+        bestRoot = &thrGRoot[0];
+        bestVis = currVis = bestRoot->visits;
         
         for (thr = 1; thr < thrCount; thr++)
         {
             if ((currVis = thrGRoot[thr].visits) > bestVis)
             {
                 bestVis = currVis;
-                bestRoot = thrGRoot[thr];
+                bestRoot = &thrGRoot[thr];
             }
         }
         
+        thrBestRes.bestMove = bestRoot->move;
+        thrBestRes.meanPts = (long double)(bestRoot->points) / bestRoot->visits;
         mtx_unlock(&rootLock);
-        thrBestRes.bestMove = bestRoot.move;
-        thrBestRes.meanPts = (long double)(bestRoot.points) / bestRoot.visits;
         
 #if defined(_WIN64) || defined(_WIN32)
         MCTS_progress(&thrBestRes, winTerm, atomic_load(&i), ++secs);
@@ -697,7 +710,7 @@ uint8_t MCTS_rootParallel(Make7 *_M7, void *_WIN_HND, const bool _OUTPUT)
 #endif
     
     }
-        
+    
     // Join the threads after completing the search
     for (thr = 0; thr < thrCount; thr++)
     {
@@ -753,9 +766,4 @@ uint8_t MCTS_rootParallel(Make7 *_M7, void *_WIN_HND, const bool _OUTPUT)
     mtx_destroy(&rootLock);
     
     return thrBestRes.bestMove;
-}
-
-static inline void MCTS_stop(int _signal)
-{
-    atomic_store(&runMCTS, false);
 }

@@ -12,7 +12,7 @@ void Negamax_setColumnMoveOrder(void)
     }
 }
 
-int Negamax_search(Make7 *_m7, TransTable *_tt, const int  _D, int _a, int _b)
+int Negamax_search(Make7* restrict _m7, TransTable* restrict _tt, const int  _D, int _a, int _b)
 {
     int rootScore, leafScore;
     uint8_t tile, col;
@@ -104,11 +104,11 @@ int Negamax_worker(void *_args)
     }
     
     mtx_unlock(nt->finishMtx);
-        
+    
     return 0;
 }
 
-Result Negamax_solve(Make7 *_m7, TransTable *_tt, const bool _VERBOSE)
+Result Negamax_solve(Make7* restrict _m7, TransTable* restrict _tt, const bool _VERBOSE)
 {
     int solution, depth, maxDep;
     
@@ -135,7 +135,7 @@ Result Negamax_solve(Make7 *_m7, TransTable *_tt, const bool _VERBOSE)
     return RESULT_DRAW;
 }
 
-Result Negamax_solve_parallel(Make7 *_m7, const bool _VERBOSE, Result *_r1, Result *_r2, Result *_r3, Result *_bestResl, uint8_t *_bestMove)
+Result Negamax_solve_parallel(Make7* restrict _m7, const bool _VERBOSE, Result *_r1, Result *_r2, Result *_r3, Result *_bestResl, uint8_t *_bestMove)
 {
     int thr, tileN, colN, finished, terminals;
     atomic_int thrRunners, finishTID;
@@ -169,7 +169,7 @@ Result Negamax_solve_parallel(Make7 *_m7, const bool _VERBOSE, Result *_r1, Resu
 #endif
     
     // Make it work with systems with low memory requirements
-    if ((thrTableSize = TransTable_prevprime((table.size + 1) / thrCount)) < TT_HASHSIZE)
+    if ((thrTableSize = TransTable_prevprime((table.size + 1) / thrCount)) <= 3)
     {
         thrTableSize = TT_HASHSIZE;
     }
@@ -184,7 +184,7 @@ Result Negamax_solve_parallel(Make7 *_m7, const bool _VERBOSE, Result *_r1, Resu
     for (terminals = thr = 0; thr < dropCount; thr++)
     {
         thrArgs[thr] = (NegamaxArgs)
-        { 
+        {
             .m7 = *_m7,
             .running = &thrRunners,
             .finishID = &finishTID,
@@ -398,7 +398,7 @@ Result Negamax_solve_parallel(Make7 *_m7, const bool _VERBOSE, Result *_r1, Resu
     return _bestResl ? *_bestResl : bestResl;
 }
 
-void Negamax_results(Make7 *_m7, Result *_r1, Result *_r2, Result *_r3, Result *_best)
+void Negamax_results(Make7* restrict _m7, Result *_r1, Result *_r2, Result *_r3, Result *_best)
 {
     uint8_t tile, col, cEnd;
     bool mirror;
@@ -422,8 +422,8 @@ void Negamax_results(Make7 *_m7, Result *_r1, Result *_r2, Result *_r3, Result *
         for (col = 0; col < cEnd; col++)
         {
 #ifdef __unix__
-                fflush(stdout);
-#endif                
+            fflush(stdout);
+#endif
             if (Make7_drop(_m7, tile, col))
             {
                 

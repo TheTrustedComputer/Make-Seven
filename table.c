@@ -51,7 +51,7 @@ size_t TransTable_prevprime(size_t _n)
     return _n;
 }
 
-bool TransTable_initialize(TransTable *_tt, const size_t _INIT_SIZE)
+bool TransTable_initialize(TransTable* restrict _tt, const size_t _INIT_SIZE)
 {
     size_t entryAlloc;
     bool success = false;
@@ -63,7 +63,7 @@ bool TransTable_initialize(TransTable *_tt, const size_t _INIT_SIZE)
         
         if ((_tt->entry = malloc(entryAlloc)))
         {
-            //memset(_tt->entry, 0, entryAlloc);
+            memset(_tt->entry, 0, entryAlloc);
             success = true;
         }
     }
@@ -71,13 +71,13 @@ bool TransTable_initialize(TransTable *_tt, const size_t _INIT_SIZE)
     return success;
 }
 
-void TransTable_destroy(TransTable *_tt)
+void TransTable_destroy(TransTable* restrict _tt)
 {
     free(_tt->entry);
     _tt->entry = NULL;
 }
 
-void TransTable_store(TransTable *_tt, const uint64_t _G_KEY, const uint64_t _KEY2, const uint64_t _KEY3, const int _VAL)
+void TransTable_store(TransTable* restrict _tt, const uint64_t _G_KEY, const uint64_t _KEY2, const uint64_t _KEY3, const int _VAL)
 {
     size_t i = _G_KEY % _tt->size;
     
@@ -87,7 +87,7 @@ void TransTable_store(TransTable *_tt, const uint64_t _G_KEY, const uint64_t _KE
     _tt->entry[i].value = _VAL;
 }
 
-int TransTable_load(TransTable *_tt, const uint64_t _G_KEY, const uint64_t _KEY2, const uint64_t _KEY3)
+int TransTable_load(TransTable* restrict _tt, const uint64_t _G_KEY, const uint64_t _KEY2, const uint64_t _KEY3)
 {
     size_t i = _G_KEY % _tt->size;
     

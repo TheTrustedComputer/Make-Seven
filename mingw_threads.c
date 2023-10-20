@@ -20,7 +20,6 @@ int thrd_create(thrd_t *_thr, thrd_start_t *_func, void *_arg)
     
     wrapper->func = _func;
     wrapper->arg = _arg;
-    printf("%x\n", thrd_create);
     
     switch (pthread_create(_thr, NULL, thrd_start_wrapper, wrapper))
     {
@@ -40,9 +39,9 @@ int thrd_join(thrd_t _thr, int *_res)
     
     joinErr = pthread_join(_thr, &res);
     
-    if (_res)
+    if (_res && res)
     {
-        *_res = *(int*)(res);
+       *_res = *(int*)(res);
     }
     
     return joinErr ? thrd_error : thrd_success;
@@ -61,13 +60,13 @@ void thrd_yield(void)
 void *thrd_start_wrapper(void *_arg)
 {
     thrd_start_wrapper_arg_t *wrapper;
-    int exit_code;
+    int return_stat;
     
     wrapper = _arg;
-    exit_code = wrapper->func(wrapper->arg);
+    return_stat = wrapper->func(wrapper->arg);
     free(wrapper);
     
-    return (void*)(exit_code);
+    return (void*)(return_stat);
 }
 
 int mtx_init(mtx_t *_mutex, int _type)

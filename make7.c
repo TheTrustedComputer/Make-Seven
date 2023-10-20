@@ -4,7 +4,7 @@
 
 #include "make7.h"
 
-void Make7_initialize(Make7 *_m7)
+void Make7_initialize(Make7* restrict _m7)
 {
     int i;
     
@@ -20,7 +20,7 @@ void Make7_initialize(Make7 *_m7)
     }
 }
 
-void Make7_print(const Make7 *_M7)
+void Make7_print(const Make7* restrict _M7)
 {
     uint64_t bit, ONE_TILES = (_M7->player[0] | _M7->player[1]) ^ (_M7->tiles23[0] | _M7->tiles23[1]);
     uint8_t numOnes, numTwos, numThrees, turn = _M7->plyNum & 1;
@@ -207,13 +207,17 @@ void Make7_print(const Make7 *_M7)
     printf("\n1:%u 2:%u 3:%u\n", numOnes, numTwos, numThrees);
 }
 
-bool Make7_tilesSumTo7(const Make7 *_M7)
+bool Make7_tilesSumTo7(const Make7* restrict _M7)
 {
     uint64_t ALL_TWOS_BITMASK, ALL_THREES_BITMASK, PLAYER_TILES_BITMASK, PLAYER_ONES_BITMASK, PLAYER_TWOS_BITMASK, PLAYER_THREES_BITMASK, \
              CURR_ONES_BITMASK, CURR_TWOS_BITMASK, CURR_THREES_BITMASK, CURR_ALL_BITMASK, HORI_BOUND_BITMASK, tileBit;
     
     uint16_t adjacents;
-    uint8_t MOVES_HISTORY, PLY_M1, NUMTILE_HEIGHT, winSum, winEnd, shifter, bitsetter;
+    uint8_t MOVES_HISTORY, PLY_M1, NUMTILE_HEIGHT, winSum, shifter, bitsetter;
+    
+#ifndef NO_SLIDERS
+    uint8_t winEnd;
+#endif
     
     // Variables initialization
     PLY_M1 = _M7->plyNum - 1;
@@ -230,23 +234,9 @@ bool Make7_tilesSumTo7(const Make7 *_M7)
     // Test for all four directions and set shift direction
     for (shifter = 0; shifter <= 3; shifter++)
     {
-        switch (shifter)
-        {
-        case 0:
-            bitsetter = 1; // Vertical shift (|)
-            break;
-        case 1:
-            bitsetter = MAKE7_SIZE_P1; // Horizontal shift (-)
-            break;
-        case 2:
-            bitsetter = MAKE7_SIZE; // Negative sloped diagonal shift (\)
-            break;
-        case 3:
-            bitsetter = MAKE7_SIZE_P2; // Positive sloped diagonal shift (/)
-        }
         
         // Set bit masks for potential wins per direction
-        switch (bitsetter)
+        switch ((bitsetter = DIRECTION_TABLE[shifter]))
         {
         case 1:
             CURR_ONES_BITMASK = PLAYER_ONES_BITMASK & VERT_BITMASK_TABLE[NUMTILE_HEIGHT];
@@ -297,7 +287,7 @@ bool Make7_tilesSumTo7(const Make7 *_M7)
                 adjacents = (adjacents << 2) | 3; // Found tile #3s
             }
             
-            // Shift toward zero to find the next tile
+            // Shift toward infinity to find the next tile
             CURR_ONES_BITMASK <<= bitsetter;
             CURR_TWOS_BITMASK <<= bitsetter;
             CURR_THREES_BITMASK <<= bitsetter;
@@ -306,8 +296,11 @@ bool Make7_tilesSumTo7(const Make7 *_M7)
         
         // Minimum number of adjacent tiles is 3 since this is the smallest quantity of tiles that can add to seven
         // 0x30 is the bit mask for the third adjacent tile; same as the condition if (totalTiles >= 3)
+        
+#ifndef NO_SLIDERS
         if (adjacents & 0x30)
         {
+#endif
             // Sum all found adjacent tiles and see if they "Make 7".
             // There are eight unique ways of adding to 7 given numbers 1, 2, and 3, equalling 44 combinations:
             //
@@ -326,14 +319,28 @@ bool Make7_tilesSumTo7(const Make7 *_M7)
             //
             // Below is a variant of the sliding window algorithm starting with a window size of 3 when the window sum is greater than 7.
             // This approach does not use arrays; thus, it reduces the memory access overhead, making this slightly more efficient.
-            winSum = (adjacents & 0x3) + ((adjacents & 0xc) >> 2) + ((adjacents & 0x30) >> (winEnd = 4));
             
+#ifdef NO_SLIDERS // A more simpler but slower approach that doesn't use sliding windows, just sum and check. Compile with -DNO_SLIDERS to use this.
+            winSum = (adjacents & 0x3) + ((adjacents & 0xc) >> 2) + ((adjacents & 0x30) >> 4);
+#else
+            winSum = (adjacents & 0x3) + ((adjacents & 0xc) >> 2) + ((adjacents & 0x30) >> (winEnd = 4));
+#endif
+            
+#ifdef NO_SLIDERS
+            while (adjacents & 0x30)
+#else
             while (adjacents & (0x3 << winEnd))
+#endif
             {
                 if (winSum == 7) // The current player wins if they have a subset sum of 7
                 {
                     return true;
                 }
+                
+#ifdef NO_SLIDERS
+                // Shift and add the next tile to check
+                winSum += ((adjacents >>= 2) & 0x3);
+#else
                 
                 if (winSum > 7) // Shift window to the right, subtracting the leftmost tile
                 {
@@ -345,19 +352,24 @@ bool Make7_tilesSumTo7(const Make7 *_M7)
                     winEnd += 2;
                     winSum += (adjacents & (0x3 << winEnd)) >> winEnd;
                 }
+#endif
             }
+        
+#ifndef NO_SLIDERS
         }
+#endif
+    
     }
     
     return false;
 }
 
-bool Make7_gameOver(const Make7 *_M7)
+bool Make7_gameOver(const Make7* restrict _M7)
 {
     return _M7->plyNum && (Make7_tilesSumTo7(_M7) || Make7_noMoreMoves(_M7));
 }
 
-bool Make7_noMoreMoves(const Make7 *_M7)
+bool Make7_noMoreMoves(const Make7* restrict _M7)
 {
     uint8_t rem1, rem2, rem3, TURN = _M7->plyNum & 1;
     
@@ -372,12 +384,12 @@ bool Make7_noMoreMoves(const Make7 *_M7)
     return (rem1 || rem2) ? false : !(rem3 && ((_M7->player[0] | _M7->player[1]) + MAKE7_BOT) & MAKE7_THREES);
 }
 
-bool Make7_gridFull(const Make7 *_M7)
+bool Make7_gridFull(const Make7* restrict _M7)
 {
     return _M7->plyNum == MAKE7_AREA;
 }
 
-bool Make7_drop(Make7 *_m7, const uint8_t _NUM_TILE, const uint8_t _COLUMN)
+bool Make7_drop(Make7* restrict _m7, const uint8_t _NUM_TILE, const uint8_t _COLUMN)
 {
     // Turn on a single bit that drops a number tile to that column
     uint64_t droppedTile = 1ull << _m7->height[_COLUMN];
@@ -419,7 +431,7 @@ bool Make7_drop(Make7 *_m7, const uint8_t _NUM_TILE, const uint8_t _COLUMN)
     return false;
 }
 
-void Make7_undrop(Make7 *_m7)
+void Make7_undrop(Make7* restrict _m7)
 {
     uint8_t lastDropHeight, lastNumTile, tileAmount, TURN;
     
@@ -442,7 +454,7 @@ void Make7_undrop(Make7 *_m7)
     _m7->remaining[lastNumTile] = (TURN ? (_m7->remaining[lastNumTile] & 0xf) : (_m7->remaining[lastNumTile] & 0xf0)) | (++tileAmount << (TURN << 2));
 }
 
-bool Make7_getUserInput(Make7 *_m7, const char _INPUT)
+bool Make7_getUserInput(Make7* restrict _m7, const char _INPUT)
 {
     uint8_t number = _INPUT - '0';
     int8_t column = _INPUT - 'A', caseTest; // Uppercase
@@ -479,7 +491,7 @@ bool Make7_getUserInput(Make7 *_m7, const char _INPUT)
     return false;
 }
 
-bool Make7_sequence(Make7 *_m7, const char *_SEQ)
+bool Make7_sequence(Make7* restrict _m7, const char* restrict _SEQ)
 {
     for (int s = 0; _SEQ[s]; s++)
     {
@@ -493,7 +505,7 @@ bool Make7_sequence(Make7 *_m7, const char *_SEQ)
     return true;
 }
 
-uint64_t Make7_hashEncode(const Make7 *_M7)
+uint64_t Make7_hashEncode(const Make7* restrict _M7)
 {
     return _M7->player[_M7->plyNum & 1] + _M7->player[0] + _M7->player[1] + MAKE7_BOT;
 }
@@ -510,7 +522,7 @@ uint64_t Make7_reverse(uint64_t _grid)
     return revGrid;
 }
 
-bool Make7_symmetrical(const Make7 *_M7)
+bool Make7_symmetrical(const Make7* restrict _M7)
 {
     uint64_t revTiles[4] = {_M7->player[0], _M7->player[1], _M7->tiles23[0], _M7->tiles23[1]};
     
@@ -524,7 +536,7 @@ bool Make7_symmetrical(const Make7 *_M7)
     return (revTiles[0] == _M7->player[0]) && (revTiles[1] == _M7->player[1]) && (revTiles[2] == _M7->tiles23[0]) && (revTiles[3] == _M7->tiles23[1]);
 }
 
-void Make7_generate(const Make7 *_M7, uint8_t *_list, uint8_t *_count)
+void Make7_generate(const Make7* restrict _M7, uint8_t* restrict _list, uint8_t* restrict _count)
 {
     uint64_t avail12Mask, avail3Mask, tileMask;
     uint8_t _1TilesLeft, _2TilesLeft, _3TilesLeft, column, TURN;
@@ -545,20 +557,20 @@ void Make7_generate(const Make7 *_M7, uint8_t *_list, uint8_t *_count)
         // Set a single bit to a droppable column
         tileMask = avail12Mask & -avail12Mask;
         column = __builtin_ctzll(tileMask) >> 3; // column / MAKE7_SIZE_P1
-    
+        
         if (_1TilesLeft)
         {
-            _list[(*_count)++] = 16 | column; // (1 << 4)
+            _list[(*_count)++] = 0x10 | column; // (1 << 4)
         }
         
         if (_2TilesLeft)
         {
-            _list[(*_count)++] = 32 | column; // (2 << 4)
+            _list[(*_count)++] = 0x20 | column; // (2 << 4)
         }
         
         if ((avail3Mask & tileMask) && _3TilesLeft)
         {
-            _list[(*_count)++] = 48 | column; // (3 << 4)
+            _list[(*_count)++] = 0x30 | column; // (3 << 4)
         }
         
         // Clear the least significant set bit
@@ -567,7 +579,7 @@ void Make7_generate(const Make7 *_M7, uint8_t *_list, uint8_t *_count)
     }
 }
 
-bool Make7_checkFor7(const Make7 *_M7)
+bool Make7_checkFor7(const Make7* restrict _M7)
 {
     Make7 check7 = *_M7;
     uint64_t avail12Mask, avail3Mask, tileMask;
@@ -630,15 +642,19 @@ bool Make7_checkFor7(const Make7 *_M7)
     return false;
 }
 
-void Make7_helpMessage(const char *_NAME)
+void Make7_helpMessage(const char* restrict _NAME)
 {
-    printf("Usage: %s <switch> [ARGUMENT]\n\nGame solver for Make 7. It is a Connect Four variant where instead of colored\n", _NAME);
+    printf("Usage: %s <switch> [ARGS]\n\n", _NAME);
+    puts("Game solver for Make 7. It is a Connect Four variant where instead of colored");
     puts("discs, players drop tiles numbered 1 to 3 on a 7x7 grid. Tiles #1 and #2 can");
     puts("drop anywhere, but tile #3 can only drop in specific locations marked by red");
     puts("squares. The object is to be the first to align these tiles so that their sum");
     puts("equals 7. It is a draw if a player runs out of tiles to drop, or if the grid");
     puts("becomes full without a winner. The solver accepts the following command-line");
     puts("switches:\n");
+    puts(" -g --profile-guided\tIgnores user input to generate a profile-guided");
+    puts("\t\t\toptimization profile to improve performance. Note that");
+    puts("\t\t\tthis requires a supported compiler.\n");
     puts(" -h -? --help\t\tDisplays this help message and exit.\n");
     puts(" -i --interactive\tAllows the user to play interactively. They can play");
     puts("\t\t\tagainst the Monte Carlo tree search AI or an additional");
@@ -650,7 +666,7 @@ void Make7_helpMessage(const char *_NAME)
     puts("\t\t\texperimental and may not work properly in every case.\n");
     puts(" -s --swap-colors\tSwaps the colors of the tiles. Instead of Green going");
     puts("\t\t\tfirst, Yellow will be going first.\n");
-    printf(" -t --table [ENTRIES]\tModifies the transposition table entry size to [ENTRIES]");
+    printf(" -t --table-size [SIZE]\tModifies the transposition table entry size to [SIZE]");
     puts("\n\t\t\tgigabytes. Its absence will use all of the available");
     puts("\t\t\tmemory. If a zero or a negative value is given, it will");
     printf("\t\t\tallocate the smallest positive value possible. Note that");
