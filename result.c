@@ -250,7 +250,7 @@ Result Result_getBestResult(const Result *_r1, const Result *_r2, const Result *
 
 uint8_t Result_getBestMove(const Result *_r1, const Result *_r2, const Result *_r3)
 {
-    unsigned long long randBest;
+    unsigned randBest;
     int i, j, bestIdx;
     uint8_t bestTile[MAKE7_SIZE_X3], bestCol[MAKE7_SIZE_X3];
     Result bestResult = Result_getBestResult(_r1, _r2, _r3);
@@ -287,7 +287,7 @@ uint8_t Result_getBestMove(const Result *_r1, const Result *_r2, const Result *_
     }
     
     assert(bestIdx);
-    randBest = genrand64_int64() % bestIdx;
+    randBest = genrand_int32() % bestIdx;
     
     return (bestTile[randBest] << 4) | (bestCol[randBest]);
 }

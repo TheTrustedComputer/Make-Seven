@@ -210,7 +210,8 @@ void Make7_print(const Make7* restrict _M7)
 bool Make7_tilesSumTo7(const Make7* restrict _M7)
 {
     uint64_t ALL_TWOS_BITMASK, ALL_THREES_BITMASK, PLAYER_TILES_BITMASK, PLAYER_ONES_BITMASK, PLAYER_TWOS_BITMASK, PLAYER_THREES_BITMASK, \
-             CURR_ONES_BITMASK, CURR_TWOS_BITMASK, CURR_THREES_BITMASK, CURR_ALL_BITMASK, HORI_BOUND_BITMASK, tileBit;
+             CURR_ONES_BITMASK, CURR_TWOS_BITMASK, CURR_THREES_BITMASK, CURR_ALL_BITMASK, HORI_BOUND_BITMASK, VERT_CHECK, HORI_CHECK, \
+             POS_DIAG_CHECK, NEG_DIAG_CHECK, PLAYER_ADJ_BITMASK, TILE_BIT;
     
     uint16_t adjacents;
     uint8_t MOVES_HISTORY, PLY_M1, NUMTILE_HEIGHT, winSum, shifter, bitsetter;
@@ -230,41 +231,64 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
     PLAYER_TWOS_BITMASK = PLAYER_TILES_BITMASK & ALL_TWOS_BITMASK;
     PLAYER_THREES_BITMASK = PLAYER_TILES_BITMASK & ALL_THREES_BITMASK;
     HORI_BOUND_BITMASK = MAKE7_BOT << (NUMTILE_HEIGHT & MAKE7_SIZE);
+    TILE_BIT = 1ull << NUMTILE_HEIGHT;
+    PLAYER_ADJ_BITMASK = ADJ_BITMASK_TABLE[NUMTILE_HEIGHT] & PLAYER_TILES_BITMASK;
+    VERT_CHECK = (TILE_BIT >> 1) & PLAYER_ADJ_BITMASK;
+    HORI_CHECK = ((TILE_BIT >> MAKE7_SIZE_P1) | (TILE_BIT << MAKE7_SIZE_P1)) & PLAYER_ADJ_BITMASK;
+    POS_DIAG_CHECK = ((TILE_BIT >> MAKE7_SIZE_P2) | (TILE_BIT << MAKE7_SIZE_P2)) & PLAYER_ADJ_BITMASK;
+    NEG_DIAG_CHECK = ((TILE_BIT >> MAKE7_SIZE) | (TILE_BIT << MAKE7_SIZE)) & PLAYER_ADJ_BITMASK;
     
     // Test for all four directions and set shift direction
     for (shifter = 0; shifter <= 3; shifter++)
     {
-        
         // Set bit masks for potential wins per direction
         switch ((bitsetter = DIRECTION_TABLE[shifter]))
         {
         case 1:
-            CURR_ONES_BITMASK = PLAYER_ONES_BITMASK & VERT_BITMASK_TABLE[NUMTILE_HEIGHT];
-            CURR_TWOS_BITMASK = PLAYER_TWOS_BITMASK & VERT_BITMASK_TABLE[NUMTILE_HEIGHT];
-            CURR_THREES_BITMASK = PLAYER_THREES_BITMASK & VERT_BITMASK_TABLE[NUMTILE_HEIGHT];
-            CURR_ALL_BITMASK = PLAYER_TILES_BITMASK & VERT_BITMASK_TABLE[NUMTILE_HEIGHT];
-            break;
+            if (VERT_CHECK) // Skip a direction if there are no potential tiles
+            {
+                CURR_ONES_BITMASK = PLAYER_ONES_BITMASK & VERT_BITMASK_TABLE[NUMTILE_HEIGHT];
+                CURR_TWOS_BITMASK = PLAYER_TWOS_BITMASK & VERT_BITMASK_TABLE[NUMTILE_HEIGHT];
+                CURR_THREES_BITMASK = PLAYER_THREES_BITMASK & VERT_BITMASK_TABLE[NUMTILE_HEIGHT];
+                CURR_ALL_BITMASK = PLAYER_TILES_BITMASK & VERT_BITMASK_TABLE[NUMTILE_HEIGHT];
+                break;
+            }
+            continue;
         case MAKE7_SIZE_P1:
-            CURR_ONES_BITMASK = PLAYER_ONES_BITMASK & HORI_BOUND_BITMASK;
-            CURR_TWOS_BITMASK = PLAYER_TWOS_BITMASK & HORI_BOUND_BITMASK;
-            CURR_THREES_BITMASK = PLAYER_THREES_BITMASK & HORI_BOUND_BITMASK;
-            CURR_ALL_BITMASK = PLAYER_TILES_BITMASK & HORI_BOUND_BITMASK;
-            break;
+            if (HORI_CHECK)
+            {
+                CURR_ONES_BITMASK = PLAYER_ONES_BITMASK & HORI_BOUND_BITMASK;
+                CURR_TWOS_BITMASK = PLAYER_TWOS_BITMASK & HORI_BOUND_BITMASK;
+                CURR_THREES_BITMASK = PLAYER_THREES_BITMASK & HORI_BOUND_BITMASK;
+                CURR_ALL_BITMASK = PLAYER_TILES_BITMASK & HORI_BOUND_BITMASK;
+                break;
+            }
+            continue;
         case MAKE7_SIZE:
-            CURR_ONES_BITMASK = PLAYER_ONES_BITMASK & NDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
-            CURR_TWOS_BITMASK = PLAYER_TWOS_BITMASK & NDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
-            CURR_THREES_BITMASK = PLAYER_THREES_BITMASK & NDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
-            CURR_ALL_BITMASK = PLAYER_TILES_BITMASK & NDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
-            break;
+            if (NEG_DIAG_CHECK)
+            {
+                CURR_ONES_BITMASK = PLAYER_ONES_BITMASK & NDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+                CURR_TWOS_BITMASK = PLAYER_TWOS_BITMASK & NDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+                CURR_THREES_BITMASK = PLAYER_THREES_BITMASK & NDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+                CURR_ALL_BITMASK = PLAYER_TILES_BITMASK & NDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+                break;
+            }
+            continue;
         case MAKE7_SIZE_P2:
-            CURR_ONES_BITMASK = PLAYER_ONES_BITMASK & PDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
-            CURR_TWOS_BITMASK = PLAYER_TWOS_BITMASK & PDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
-            CURR_THREES_BITMASK = PLAYER_THREES_BITMASK & PDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
-            CURR_ALL_BITMASK = PLAYER_TILES_BITMASK & PDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+            if (POS_DIAG_CHECK)
+            {
+                CURR_ONES_BITMASK = PLAYER_ONES_BITMASK & PDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+                CURR_TWOS_BITMASK = PLAYER_TWOS_BITMASK & PDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+                CURR_THREES_BITMASK = PLAYER_THREES_BITMASK & PDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+                CURR_ALL_BITMASK = PLAYER_TILES_BITMASK & PDIAG_BITMASK_TABLE[NUMTILE_HEIGHT];
+                break;
+            }
+        default:
+            continue;
         }
         
         // (Re)set looping variables; move tileBit to the leftmost tile before hitting an empty tile
-        for (adjacents = 0, tileBit = 1ull << NUMTILE_HEIGHT; CURR_ALL_BITMASK & (tileBit << bitsetter); tileBit <<= bitsetter);
+        for (adjacents = 0, TILE_BIT = 1ull << NUMTILE_HEIGHT; CURR_ALL_BITMASK & (TILE_BIT << bitsetter); TILE_BIT <<= bitsetter);
         
         // Search tiles in this direction; it is guaranteed that there is at least one found adjacent tile
         // It is a 16-bit integer to store binary encoded adjacent tiles (2 bits per tile, 7 tiles max, totaling 14 bits)
@@ -274,15 +298,15 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
         // 11: tile #3
         do
         {
-            if (CURR_ONES_BITMASK & tileBit)
+            if (CURR_ONES_BITMASK & TILE_BIT)
             {
                 adjacents = (adjacents << 2) | 1; // Found tile #1s
             }
-            else if (CURR_TWOS_BITMASK & tileBit)
+            else if (CURR_TWOS_BITMASK & TILE_BIT)
             {
                 adjacents = (adjacents << 2) | 2; // Found tile #2s
             }
-            else if (CURR_THREES_BITMASK & tileBit)
+            else if (CURR_THREES_BITMASK & TILE_BIT)
             {
                 adjacents = (adjacents << 2) | 3; // Found tile #3s
             }
@@ -297,10 +321,8 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
         // Minimum number of adjacent tiles is 3 since this is the smallest quantity of tiles that can add to seven
         // 0x30 is the bit mask for the third adjacent tile; same as the condition if (totalTiles >= 3)
         
-#ifndef NO_SLIDERS
         if (adjacents & 0x30)
         {
-#endif
             // Sum all found adjacent tiles and see if they "Make 7".
             // There are eight unique ways of adding to 7 given numbers 1, 2, and 3, equalling 44 combinations:
             //
@@ -320,24 +342,30 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
             // Below is a variant of the sliding window algorithm starting with a window size of 3 when the window sum is greater than 7.
             // This approach does not use arrays; thus, it reduces the memory access overhead, making this slightly more efficient.
             
-#ifdef NO_SLIDERS // A more simpler but slower approach that doesn't use sliding windows, just sum and check. Compile with -DNO_SLIDERS to use this.
+            // A more simpler but slower approach that doesn't use sliding windows, just sum and check. Compile with -DNO_SLIDERS to use this.
+#ifdef NO_SLIDERS
             winSum = (adjacents & 0x3) + ((adjacents & 0xc) >> 2) + ((adjacents & 0x30) >> 4);
 #else
             winSum = (adjacents & 0x3) + ((adjacents & 0xc) >> 2) + ((adjacents & 0x30) >> (winEnd = 4));
 #endif
-            
-#ifdef NO_SLIDERS
-            while (adjacents & 0x30)
-#else
-            while (adjacents & (0x3 << winEnd))
-#endif
+            do
             {
+#ifdef NO_SLIDERS
+                // Remove the three adjacent tiles since we already added them
+                adjacents >>= 4;
+#endif
+
                 if (winSum == 7) // The current player wins if they have a subset sum of 7
                 {
                     return true;
                 }
                 
 #ifdef NO_SLIDERS
+                if (winSum > 7) // Do not add the next tile if the sum is greater than 7   
+                {
+                    break;
+                }
+                
                 // Shift and add the next tile to check
                 winSum += ((adjacents >>= 2) & 0x3);
 #else
@@ -354,11 +382,13 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
                 }
 #endif
             }
-        
-#ifndef NO_SLIDERS
-        }
+#ifdef NO_SLIDERS
+            while (adjacents);
+#else
+            while (adjacents & (0x3 << winEnd));
 #endif
-    
+        
+        }
     }
     
     return false;
@@ -589,7 +619,6 @@ bool Make7_checkFor7(const Make7* restrict _M7)
     avail12Mask = ((check7.player[0] | check7.player[1]) + MAKE7_BOT) & MAKE7_ALL;
     avail3Mask = avail12Mask & MAKE7_THREES;
     
-    // Obtain tiles left for the current player
     _1TilesLeft = TURN ? (check7.remaining[0] >> 4) : (check7.remaining[0] & 0xf);
     _2TilesLeft = TURN ? (check7.remaining[1] >> 4) : (check7.remaining[1] & 0xf);
     _3TilesLeft = TURN ? (check7.remaining[2] >> 4) : (check7.remaining[2] & 0xf);
@@ -653,8 +682,8 @@ void Make7_helpMessage(const char* restrict _NAME)
     puts("becomes full without a winner. The solver accepts the following command-line");
     puts("switches:\n");
     puts(" -g --profile-guided\tIgnores user input to generate a profile-guided");
-    puts("\t\t\toptimization profile to improve performance. Note that");
-    puts("\t\t\tthis requires a supported compiler.\n");
+    puts("\t\t\toptimization file to improve performance. Note that this");
+    puts("\t\t\trequires a supported compiler.\n");
     puts(" -h -? --help\t\tDisplays this help message and exit.\n");
     puts(" -i --interactive\tAllows the user to play interactively. They can play");
     puts("\t\t\tagainst the Monte Carlo tree search AI or an additional");

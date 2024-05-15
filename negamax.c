@@ -283,11 +283,13 @@ Result Negamax_solve_parallel(Make7* restrict _m7, const bool _VERBOSE, Result *
         }
     }
     
-    // Signal the worker threads to continue after the barrier
-    mtx_lock(&thrStartMutex);
-    cnd_broadcast(&thrStartCondV);
+    // 
     atomic_store(&idle, false);
-    mtx_unlock(&thrStartMutex);
+    
+    // Signal the worker threads to continue after the barrier
+    //mtx_lock(&thrStartMutex);
+    cnd_broadcast(&thrStartCondV);
+    //mtx_unlock(&thrStartMutex);
     
     // Wait for the threads to finish
     while (atomic_load(&thrRunners))

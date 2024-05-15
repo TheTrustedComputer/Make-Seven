@@ -34,7 +34,7 @@
 // sqrt(2) is a good balance between exploration and exploitation
 // smalller = more exploitation; larger = more exploration
 #define MCTS_UCT_C 1.41421356237309504880168872420969807856967187537694807317667973799073247846210703885l
-#define MCTS_INVALID -100.0l // Valid range is [-50, 50]
+#define MCTS_INVALID -1000.0l // Random invalid value
 
 // Flag to run the search via Ctrl-C
 static atomic_bool runMCTS = true;
@@ -47,17 +47,25 @@ typedef struct MCTSNode
     signed long long points;
     unsigned long long visits;
     struct MCTSNode *ancestor, *descendant;
-    uint8_t move, count;
+    uint16_t move : 6, /* depth : 6, */ state : 2;
+    uint8_t count;
 }
 MCTSNode;
 
 // Data structure to return the best move and its mean points
 typedef struct
 {
-    long double meanPts;
-    uint8_t bestMove;
+    double meanPts;
+    uint8_t bestMove, bestState;
 }
 MCTSResult;
+
+// MCTSNode solved status
+typedef enum
+{
+    MCTS_UNSOLVED, MCTS_LOSS, MCTS_DRAW, MCTS_WIN
+}
+NodeStatus;
 
 // MCTSNode root parallelization worker thread
 typedef struct
@@ -73,51 +81,50 @@ typedef struct
 MCTSRootThread;
 
 /*
-// Leaf parallelization worker thread
 typedef struct
 {
-    Make7 simulMS;
-    MCTSNode *backprop;
-    long long *simScore, *simResult;
-    int id;
-    uint8_t turn;
+    Make7 localM7;
+    Barrier *start, *finish;
+    signed long long *localRes;
+    unsigned long long seed;
+    long *total, id;
 }
-MCTSLeafThread;
+SimulThread;*/
 
-// Work queue for leaf parallelization
 typedef struct
 {
-    MCTSLeafThread *items;
-    size_t size, capacity, front, back;
-    mtx_t *lock;
-    cnd_t *notEmpty, *notFull;
+    MCTSNode *root;
+    MCTSResult *result;
+    long long *iters, *seconds;
+    void **winConHandle;
 }
-MTCSWorkQueue;
-*/
+ProgressThread;
 
 // Memory management
 void MCTSNode_initialize(MCTSNode*, MCTSNode*, const uint8_t);                                                  // Initialize a Monte Carlo tree search node
 void MCTSNode_destroy(MCTSNode*);                                                                               // Recursively release memory from it and its descendants
 
 // Functions for debugging
-void MCTSNode_printNode(const MCTSNode*);                                                                        // Print this node's current information
+void MCTSNode_print(const MCTSNode*);                                                                           // Print this node's current information
 void MCTSNode_printAll(const MCTSNode*, const int);                                                             // Print all of the nodes of the Monte Carlo tree
 void MCTSNode_avgPoints(const MCTSNode*);                                                                       // Print the average point per visits of descendant nodes
 
 // Monte Carlo tree search
-long double MCTS_uct(const MCTSNode*);                                                                          // Compute the upper confidence bound for trees
+double MCTS_uct(const MCTSNode*);                                                                          // Compute the upper confidence bound for trees
 MCTSNode *MCTS_select(MCTSNode*, Make7*);                                                                       // Select the best node to expand
 bool MCTS_expand(MCTSNode*, const Make7*);                                                                      // Expand the selected node for every move
 signed long long MCTS_simulate(Make7*, const uint8_t);                                                          // Simulate a random game from the current state
 void MCTS_backpropagate(MCTSNode*, signed long long);                                                           // Backpropagate the result of the simulation
-MCTSResult MCTS_best(MCTSNode*);                                                                          // Return the best move from the root node
-uint8_t MCTS_search(const Make7*, void*, const bool);                                                     // Entry point for the Monte Carlo tree search algorithm
-void MCTS_progress(const MCTSResult*, void*, const unsigned long long, const unsigned long long);         // Write the Monte Carlo tree search progress to stdout
-void MCTS_pointStats(void*, const long double*, const long double*, const long double*);                  // Display the cumulative point statistics for each move
+MCTSResult MCTS_best(MCTSNode*);                                                                                // Return the best move from the root node
+uint8_t MCTS_search(const Make7*, void*, const bool);                                                           // Entry point for the Monte Carlo tree search algorithm
+void MCTS_progress(const MCTSResult*, void*, const unsigned long long, const unsigned long long, const uint8_t);               // Write the Monte Carlo tree search progress to stdout
+void MCTS_pointStats(void*, const double*, const double*, const double*, const uint8_t*, const uint8_t*, const uint8_t*);                        // Display the cumulative point statistics for each move
 
 // Multi-threading
 void MCTSNode_update(MCTSNode*, MCTSNode*, const uint8_t);                                                      // Update the global root node's statistics
 int MCTS_rootWorker(void*);                                                                                     // Main function for the Monte Carlo tree search worker
-uint8_t MCTS_rootParallel(Make7*, void*, const bool);                                                     // Run the algorithm in parallel at the root node
+uint8_t MCTS_rootParallel(Make7*, void*, const bool);                                                           // Run the algorithm in parallel at the root node
+
+void NodeStatus_print(const NodeStatus, const bool);
 
 #endif /* MCTS_H */

@@ -26,11 +26,13 @@
 #endif
 
 // We will include source files directly for maximum performance
-#include "mt19937-64.h"
+#include "mt19937ar-cok.h"
+//#include "mt19937-64.h"
 #include "make7.c"
 #include "table.c"
 #include "result.c"
 #include "negamax.c"
+//#include "barrier.c"
 #include "mcts.c"
 
 static inline void stopPGO(int UNUSED)
@@ -281,7 +283,7 @@ int main(int argc, char **argv)
     }
     
     // Seed the Mersenne Twister PRNG
-    init_genrand64(time(NULL) + clock());
+    init_genrand(time(NULL) + clock());
      
     // Prepare alpha-beta move ordering array
     Negamax_setColumnMoveOrder();
@@ -290,14 +292,14 @@ int main(int argc, char **argv)
     Make7_initialize(&ms);
     
     // Print greetings and details
-    puts("Pressman Make 7 solver by TheTrustedComputer");
+    puts("Make 7 solver by TheTrustedComputer");
     
     if (interactive)
     {
         type = '0';
         humanMove = true;
         
-        puts("Interactive mode\n");
+        puts("Running in interactive mode\n");
         
         // Interactive loop
         while (running)
@@ -339,11 +341,11 @@ int main(int argc, char **argv)
                 {
 #if defined(_WIN64) || defined(_WIN32)
                     SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
-                    printf("%s wins! Play again?\n", ms.plyNum & 1 ? MAKE7_P1_NAME : MAKE7_P2_NAME);
+                    printf("%s wins! Play again?\n", ms.plyNum & 1 ? "Player 1" : "Player 2");
                     SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
                     puts("Y: Yes\nN: No");
 #else
-                    printf("\e[1m%s wins! Play again?\n\e[0mY: Yes\nN: No\n", ms.plyNum & 1 ? MAKE7_P1_NAME : MAKE7_P2_NAME);
+                    printf("\e[1m%s wins! Play again?\n\e[0mY: Yes\nN: No\n", ms.plyNum & 1 ? "Player 1" : "Player 2");
 #endif
                     over = true;
                     continue;
@@ -382,7 +384,7 @@ int main(int argc, char **argv)
 #endif
                         if (!humanInput[1] || !Make7_sequence(&ms, humanInput))
                         {
-                            fprintf(stderr, "Please enter a valid move.\n");
+                            fprintf(stderr, "Please enter a valid move from the list.\n");
                             while (getchar() != '\n');
                             continue;
                         }
@@ -401,6 +403,7 @@ int main(int argc, char **argv)
                     mctsMove = MCTS_search(&ms, NULL, false);
 #endif
                     Make7_drop(&ms, mctsMove >> 4, mctsMove & 0x7);
+                    puts("");
                 }
                 
                 // Switch player depending on the type
@@ -428,6 +431,12 @@ int main(int argc, char **argv)
     else
     {
         monteCarloTS ? puts("Using Monte Carlo tree search") : printf("Transposition table of %lu entries\n", table.size);
+        
+#ifdef NO_SLIDERS
+        puts("Not utilizing sliding windows");
+#else
+        puts("Utilizing sliding windows");
+#endif
         
         // Solving loop
         while (running)
@@ -457,7 +466,8 @@ int main(int argc, char **argv)
                     {
                         if (!Make7_getUserInput(&ms, input))
                         {
-                            if (input == '\n') {
+                            if (input == '\n')
+                            {
                                 break;
                             }
                         }
