@@ -15,18 +15,20 @@ static inline void MCTS_stop(int UNUSED)
  *  @param _init    The MCTS node to initialize.
  *  @param _ancest  The ancestor or parent node.
  *  @param _MOVE    The move that led to this node.
- *  @param _DEPTH   The tree depth of this node.
  */
 void MCTSNode_initialize(MCTSNode* restrict _init, MCTSNode* restrict _ancest, const uint8_t _MOVE)
 {
     _init->ancestor = _ancest;
-    _init->descendant = NULL;
+    _init->descendant = nullptr;
     _init->points = _init->visits = _init->count = 0;
     _init->move = _MOVE;
     _init->state = MCTS_UNSOLVED;
     // _init->depth = _ancest ? _ancest->depth + 1 : 0;
 }
 
+/*!
+ *  @param _dest The MCTS node to destroy or free.
+ */
 void MCTSNode_destroy(MCTSNode* restrict _dest)
 {
     uint8_t node;
@@ -42,11 +44,18 @@ void MCTSNode_destroy(MCTSNode* restrict _dest)
     }
 }
 
+/*!
+ *  @param _PRINT The MCTS node to print.
+ */
 void MCTSNode_print(const MCTSNode* restrict _PRINT)
 {
     printf("\e[1m%d%c\e[0m: %lld %lld %d %.8f\n", _PRINT->move >> 4, 'A' + (_PRINT->move & 0xf), _PRINT->points, _PRINT->visits, _PRINT->count, MCTS_uct(_PRINT));
 }
 
+/*!
+ *  @param _PRINTALL Which MCTS node to print all of.
+ *  @param _DEPTH    The depth of the node.
+ */
 void MCTSNode_printAll(const MCTSNode* restrict _PRINTALL, const int _DEPTH)
 {
     uint8_t node;
@@ -66,6 +75,9 @@ void MCTSNode_printAll(const MCTSNode* restrict _PRINTALL, const int _DEPTH)
     }
 }
 
+/*!
+ *  @param _PTS The MCTS node to print the average points.
+ */
 void MCTSNode_avgPoints(const MCTSNode* restrict _PTS)
 {
     double avg;
@@ -82,12 +94,19 @@ void MCTSNode_avgPoints(const MCTSNode* restrict _PTS)
     }
 }
 
+/*!
+ *  @param _UCT The MCTS node to calculate the upper confidence bound for trees (UCT).
+ *  @return     The UCT value of that node.
+ *  @note       It has been adapted to work with the points-based metric.
+ */
 double MCTS_uct(const MCTSNode* restrict _UCT)
 {
     return ((double)(_UCT->points) / _UCT->visits) + sqrt(2.0 * log((double)(_UCT->ancestor->visits) / _UCT->visits));
 }
 
-
+/*!
+ *  @param _status The MCTS node to update the game-theoretic state.
+ */
 void MCTS_updateState(MCTSNode* restrict _status)
 {
     uint8_t draws, wins, unsolved, i;
@@ -120,7 +139,7 @@ void MCTS_updateState(MCTSNode* restrict _status)
         }
         else if (i && i == wins)
         {
-            _status->state = MCTS_LOSS; // Opponent can win regardless of our moves
+            _status->state = MCTS_LOSS; // Opponent can win regardless of what we move
         }
     }
 }
@@ -200,7 +219,6 @@ bool MCTS_expand(MCTSNode* restrict _expander, const Make7* restrict _M7)
 /*!
  *  @param _simulMS The Make 7 game state to simulate.
  *  @param _TURN    Who's turn it is to play.
- *  @param _SCORE   The score to reward the simulation with.
  *  @return         The reward for the simulation.
  */
 signed long long MCTS_simulate(Make7* restrict _simulMS, const uint8_t _TURN)
@@ -224,7 +242,7 @@ signed long long MCTS_simulate(Make7* restrict _simulMS, const uint8_t _TURN)
             if (Make7_tilesSumTo7(_simulMS))
             {
                 // ^ is the same as != on a single bit
-                return _TURN ^ (_simulMS->plyNum & 1) ? -1 : 1;
+                return (_TURN ^ _simulMS->turn) ? -1 : 1;
             }
         }
         else
@@ -235,7 +253,7 @@ signed long long MCTS_simulate(Make7* restrict _simulMS, const uint8_t _TURN)
 }
 
 /*!
- *  @param _backpropagator The MCTS node to backpropagate from.
+ *  @param _backpropagator The MCTS node to backpropagate.
  *  @param _simulResult    The result of the simulation.
  */
 void MCTS_backpropagate(MCTSNode* restrict _backpropagator, signed long long _simulResult)
@@ -252,7 +270,7 @@ void MCTS_backpropagate(MCTSNode* restrict _backpropagator, signed long long _si
 
 /*!
  *  @param _root The root MCTS node to search from.
- *  @return      The move with the highest visits.
+ *  @return      The move with the highest visits and odds of winning.
  */
 MCTSResult MCTS_best(MCTSNode* restrict _root)
 {
@@ -280,7 +298,6 @@ MCTSResult MCTS_best(MCTSNode* restrict _root)
     
     // Pick the descendant that's likely to lose, as this means the ancestor is favored to win
     // In other cases, delay the decision until all descendants have been decided
-    
     if (descLosses)
     {
         bestState = MCTS_LOSS;
@@ -324,6 +341,7 @@ MCTSResult MCTS_best(MCTSNode* restrict _root)
         }
     }
     
+    // If there is only one node, choose that
     if (!bestNode)
     {
         bestNode = &_root->descendant[0];
@@ -357,10 +375,11 @@ int SimulThread_simulate(void *_args)
 int ProgressThread_print(void *_args)
 {
     ProgressThread *progress = _args;
+    struct timespec oneSec = {.tv_sec = 1};
     
     for (;;)
     {
-        thrd_sleep(&(struct timespec){.tv_sec = 1}, NULL);
+        thrd_sleep(&oneSec, NULL);
         
         if (atomic_load(&runMCTS) && progress->root->state == MCTS_UNSOLVED)
         {
@@ -505,7 +524,7 @@ uint8_t MCTS_search(const Make7* restrict _M7, void* restrict _WIN_HND, const bo
         {
             leaf = &leaf->descendant[genrand_int32() % leaf->count];
             Make7_drop(&mctsM7, leaf->move >> 4, leaf->move & 0xf);
-            sims = MCTS_simulate(&mctsM7, mctsM7.plyNum & 1);
+            sims = MCTS_simulate(&mctsM7, mctsM7.turn);
             
             /*// Copy the game state to the threads
             for (tid = 0; tid < numThreads; tid++)
@@ -527,16 +546,16 @@ uint8_t MCTS_search(const Make7* restrict _M7, void* restrict _WIN_HND, const bo
         }
         else
         {
-            sims = 0;
+            sims = MAKE7_AREA_P1 - Make7_plyNum(&mctsM7);
             
             // Check immediate wins and losses, rewarding them with higher scores
             if (Make7_tilesSumTo7(&mctsM7))
             {
-                sims = MAKE7_AREA_P1 - mctsM7.plyNum;
                 leaf->state = MCTS_LOSS;
             }
             else if (Make7_noMoreMoves(&mctsM7))
             {
+                sims = 0;
                 leaf->state = MCTS_DRAW;
             }
         }
@@ -978,7 +997,7 @@ int MCTS_rootWorker(void *_args)
         }
         
         // Simulate and backpropagate
-        localSim = Make7_tilesSumTo7(&mrt->copyM7) ? MAKE7_AREA_P1 - mrt->copyM7.plyNum : MCTS_simulate(&mrt->copyM7, mrt->copyM7.plyNum & 1);
+        localSim = Make7_tilesSumTo7(&mrt->copyM7) ? MAKE7_AREA_P1 - Make7_plyNum(&mrt->copyM7) : MCTS_simulate(&mrt->copyM7, mrt->copyM7.turn);
         MCTS_backpropagate(leaf, localSim);
         
         // Reset the local game state for another iteration
@@ -1168,20 +1187,19 @@ uint8_t MCTS_rootParallel(Make7* restrict _M7, void* restrict _WIN_HND, const bo
 
 void NodeStatus_print(const NodeStatus _NS, const bool _FLIP_STATUS)
 {
-    if (_NS == MCTS_WIN)
+    switch (_NS)
     {
+    case MCTS_WIN:
         _FLIP_STATUS ? printf("LOSS") : printf("WIN");
-    }
-    else if (_NS == MCTS_DRAW)
-    {
+        break;
+    case MCTS_DRAW:
         printf("DRAW");
-    }
-    else if (_NS == MCTS_LOSS)
-    {
+        break;
+    case MCTS_LOSS:
         _FLIP_STATUS ? printf("WIN") : printf("LOSS");
-    }
-    else
-    {
+        break;
+    default:
         printf("UNSOLVED");
+        break;
     }
 }

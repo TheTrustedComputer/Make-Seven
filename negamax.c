@@ -12,52 +12,50 @@ void Negamax_setColumnMoveOrder(void)
     }
 }
 
-int Negamax_search(Make7* restrict _m7, TransTable* restrict _tt, const int  _D, int _a, int _b)
-{
-    int rootScore, leafScore;
-    uint8_t tile, col;
-    
+int Negamax_search(const Make7* restrict _M7, TransTable* restrict _tt, const int  _D, int _a, int _b)
+{    
     // Increment the number of game tree nodes searched
     atomic_fetch_add(&nodes, 1);
     
     // See if the score is in the transposition table
-    if ((tableScore = TransTable_load(_tt, Make7_hashEncode(_m7), _m7->tiles23[0], _m7->tiles23[1])))
+    if ((tableScore = TransTable_load(_tt, Make7_hashEncode(_M7), _M7->tiles23[0], _M7->tiles23[1])))
     {
         return tableScore;
     }
     
     // Check for a "Make 7"
-    if (Make7_checkFor7(_m7))
+    if (Make7_checkFor7(_M7))
     {
         return NM_WIN; // The current player wins
     }
     
     // Check if the player cannot make any more moves or hiting maxiumum depth
-    if (!_D || Make7_noMoreMoves(_m7))
+    if (!_D || Make7_noMoreMoves(_M7))
     {
         return NM_DRAW; // Assume a draw
     }
     
-    rootScore = _a;
+    int leafScore, rootScore = _a;
+    Make7 negamaxM7 = *_M7;
     
-    for (tile = 4; --tile;)
+    for (uint8_t tile = 4; --tile;)
     {
-        for (col = 0; col < MAKE7_SIZE; col++)
+        for (uint8_t col = 0; col < MAKE7_SIZE; col++)
         {
-            if (Make7_drop(_m7, tile, moveOrder[col]))
+            if (Make7_drop(&negamaxM7, tile, moveOrder[col]))
             {
                 // Drop tiles and see if our score beats the current best score
-                if ((leafScore = -Negamax_search(_m7, _tt, _D - 1, -_b, -_a)) > rootScore)
+                if ((leafScore = -Negamax_search(&negamaxM7, _tt, _D - 1, -_b, -_a)) > rootScore)
                 {
                     rootScore = leafScore;
                 }
                 
-                Make7_undrop(_m7);
+                negamaxM7 = *_M7;
                 
                 // Update best score if it's better than the current best, and store the lower bound
                 if (_a < rootScore)
                 {
-                    TransTable_store(_tt, Make7_hashEncode(_m7), _m7->tiles23[0], _m7->tiles23[1], (_a = rootScore));
+                    TransTable_store(_tt, Make7_hashEncode(_M7), _M7->tiles23[0], _M7->tiles23[1], (_a = rootScore));
                     
                     // Alpha cut-off
                     if (_a >= _b)
@@ -70,7 +68,7 @@ int Negamax_search(Make7* restrict _m7, TransTable* restrict _tt, const int  _D,
     }
     
     // Save the upper bound
-    TransTable_store(_tt, Make7_hashEncode(_m7), _m7->tiles23[0], _m7->tiles23[1], _a);
+    TransTable_store(_tt, Make7_hashEncode(_M7), _M7->tiles23[0], _M7->tiles23[1], _a);
 
     return _a;
 }
@@ -110,13 +108,10 @@ int Negamax_worker(void *_args)
 
 Result Negamax_solve(Make7* restrict _m7, TransTable* restrict _tt, const bool _VERBOSE)
 {
-    int solution, depth, maxDep;
-    
-    solution = NM_DRAW;
-    maxDep = 49 - _m7->plyNum;
+    int solution = NM_DRAW, maxDep = MAKE7_AREA - Make7_plyNum(_m7);
     
     // Iterative deepening to solve shallow wins and losses
-    for (depth = 0; depth < maxDep; depth++)
+    for (int depth = 0; depth < maxDep; depth++)
     {
         if (_VERBOSE)
         {
@@ -401,14 +396,12 @@ Result Negamax_solve_parallel(Make7* restrict _m7, const bool _VERBOSE, Result *
 }
 
 void Negamax_results(Make7* restrict _m7, Result *_r1, Result *_r2, Result *_r3, Result *_best)
-{
-    uint8_t tile, col, cEnd;
-    bool mirror;
-    
+{    
     // Check to see if the mirror image of the game state is the same
     // If so, only search the left side of the grid
-    mirror = Make7_symmetrical(_m7);
-    cEnd = mirror ? 4 : MAKE7_SIZE;
+    bool mirror = Make7_symmetrical(_m7);
+    uint8_t cEnd = mirror ? 4 : MAKE7_SIZE, tile, col;
+    Make7 resultM7 = *_m7;
     
     // Flush results with unknown values
     for (tile = 0; tile < cEnd; tile++)
@@ -426,11 +419,11 @@ void Negamax_results(Make7* restrict _m7, Result *_r1, Result *_r2, Result *_r3,
 #ifdef __unix__
             fflush(stdout);
 #endif
-            if (Make7_drop(_m7, tile, col))
+            if (Make7_drop(&resultM7, tile, col))
             {
                 
                 // Look for immediate wins
-                if (Make7_tilesSumTo7(_m7))
+                if (Make7_tilesSumTo7(&resultM7))
                 {
                     switch (tile)
                     {
@@ -474,7 +467,7 @@ void Negamax_results(Make7* restrict _m7, Result *_r1, Result *_r2, Result *_r3,
                     switch (tile)
                     {
                     case 1:
-                        _r1[col] = Negamax_solve(_m7, &table, false);
+                        _r1[col] = Negamax_solve(&resultM7, &table, false);
                         Result_increment(&_r1[col]);
                         
                         if (mirror)
@@ -483,7 +476,7 @@ void Negamax_results(Make7* restrict _m7, Result *_r1, Result *_r2, Result *_r3,
                         }
                         break;
                     case 2:
-                        _r2[col] = Negamax_solve(_m7, &table, false);
+                        _r2[col] = Negamax_solve(&resultM7, &table, false);
                         Result_increment(&_r2[col]);
                         
                         if (mirror)
@@ -492,7 +485,7 @@ void Negamax_results(Make7* restrict _m7, Result *_r1, Result *_r2, Result *_r3,
                         }
                         break;
                     case 3:
-                        _r3[col] = Negamax_solve(_m7, &table, false);
+                        _r3[col] = Negamax_solve(&resultM7, &table, false);
                         Result_increment(&_r3[col]);
                         
                         if (mirror)
@@ -501,7 +494,8 @@ void Negamax_results(Make7* restrict _m7, Result *_r1, Result *_r2, Result *_r3,
                         }
                     }
                 }
-                Make7_undrop(_m7);
+                
+                resultM7 = *_m7;
             }
             
             // Print the results

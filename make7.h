@@ -31,7 +31,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <stdbool.h>
+#include <stdbit.h>
 
 // Make 7's board dimensions is a fixed seven-by-seven square to take into account of the one tiles.
 #define MAKE7_SIZE 7
@@ -56,10 +56,10 @@
 #define MAKE7_P1_NAME "Green"
 #define MAKE7_P2_NAME "Yellow"
 
-// Global temporary storage locations or buffers for the number tiles from user input
+// Global temporary storage locations or buffers for the number tiles from user input.
 static uint8_t g_userNumberTile, g_inputReadyFlag;
 
-// Whether to swap the tile colors in the output
+// Whether to swap the tile colors in the output.
 static bool g_swapColors;
 
 // Vertical bitmask table to search for vertical connections below this tile, including itself
@@ -107,36 +107,38 @@ static const uint8_t DIRECTION_TABLE[4] = {1, MAKE7_SIZE_P1, MAKE7_SIZE, MAKE7_S
 // The core Make 7 structure in which all movements and calculations are performed here.
 typedef struct
 {
-    uint64_t player[2], tiles23[2];                     // The bitboard of each player's number tiles and all dropped tiles except 1s.
-    uint8_t movesHist[MAKE7_AREA];                      // Variable to store the history of played moves in this round.
-    uint8_t height[MAKE7_SIZE];                         // The bit position of the height of each column of the grid.
-    uint8_t remaining[3], plyNum;                       // Remaining tiles and the number of piles or half-moves.
+    uint64_t player[2], tiles23[2];                             // The bitmap of each player's number tiles and all dropped tiles except 1s.
+    uint8_t height[MAKE7_SIZE];                                 // The bit position of the height of each column of the grid.
+    uint8_t remaining[3];                                       // The remaining tiles for each player: lower 4 bits => P1; upper 4 bits => P2
+    uint8_t lastTile;                                           // A variable to store the last dropped tile by the current player.
+    bool turn;                                                  // The current player's turn: False = Player 1; True = Player 2.
 }
 Make7;
 
 // Memory and I/O
-void Make7_initialize(Make7*);                          // Resets the Make 7 data structure to the initial position.
-void Make7_print(const Make7*);                         // Prints the board of number tiles and their amount to the console.
+void Make7_initialize(Make7*);                                  // Resets the Make 7 data structure to the initial position.
+void Make7_print(const Make7*);                                 // Prints the board of number tiles and their amount to the console.
 
 // Logical functions
-bool Make7_tilesSumTo7(const Make7*);                   // Returns true if the board configuration has an arrangement of tiles that sums to at least seven.
-bool Make7_gameOver(const Make7*);                      // Tests if the game is over, i.e. a player has a winning alignment or neither have any tiles left.
-bool Make7_noMoreMoves(const Make7*);                   // True when the current player to move has no more legal moves and false otherwise.
-bool Make7_gridFull(const Make7*);                      // Another draw condition is when the grid becomes full if either player has tiles left.
+bool Make7_tilesSumTo7(const Make7*);                           // Returns true if the board configuration has an arrangement of tiles that sums to at least seven.
+bool Make7_gameOver(const Make7*);                              // Tests if the game is over, i.e. a player has a winning alignment or neither have any tiles left.
+bool Make7_noMoreMoves(const Make7*);                           // True when the current player to move has no more legal moves and false otherwise.
+uint8_t Make7_plyNum(const Make7*);                             // Counts the number of plies or half-moves using population count.
+bool Make7_gridFull(const Make7*);                              // Another draw condition is when the grid becomes full if either player has tiles left.
 
 // Move functions
-bool Make7_drop(Make7*, const uint8_t, const uint8_t);  // Drops a number tile to a column as long as that column is not full.
-void Make7_undrop(Make7*);                              // Undos the dropping of number tiles--used only during search.
+bool Make7_drop(Make7*, const uint8_t, const uint8_t);          // Drops a number tile to a column as long as that column is not full.
+// void Make7_undrop(Make7*);                                   // Undos the dropping of number tiles--used only during search.
 
 // User input functions
-bool Make7_getUserInput(Make7*, const char);            // Makes a move from user input. Numbers specify what tile to use and letters what column to drop.
-bool Make7_sequence(Make7*, const char*);               // Makes moves from a string of characters. This is used when the user chooses to pass them as arguments.
+bool Make7_getUserInput(Make7*, const char);                    // Performs a move from user input. Numbers specify what tile to use and letters what column to drop.
+bool Make7_sequence(Make7*, const char*);                       // Perform moves from a string of characters. This is used when the user chooses to pass them as arguments.
 
 // Other functions
-uint64_t Make7_hashEncode(const Make7*);                // Encodes a hashed Make 7 position for use in the transposition table.
-uint64_t Make7_reverse(uint64_t);                       // Returns the horizontal inversion of a Make 7 grid bitboard.
-bool Make7_symmetrical(const Make7*);                   // Is the board's left side the same as its right side when flipped horizontally?
-void Make7_generate(const Make7*, uint8_t*, uint8_t*);  // Generates all possible drop moves for the current player.
-void Make7_helpMessage(const char*);                    // Prints a help message to the console.
+uint64_t Make7_hashEncode(const Make7*);                        // Encodes a hashed Make 7 position for use in the transposition table.
+uint64_t Make7_reverse(uint64_t);                               // Returns the horizontal inversion of a Make 7 grid bitboard.
+bool Make7_symmetrical(const Make7*);                           // Is the board's left side the same as its right side when flipped horizontally?
+void Make7_generate(const Make7*, uint8_t*, uint8_t*);          // Generates all possible drop moves for the current player.
+void Make7_helpMessage(const char*);                            // Prints a help message to the console.
 
 #endif /* MAKE7_H */

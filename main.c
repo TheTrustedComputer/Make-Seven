@@ -341,11 +341,11 @@ int main(int argc, char **argv)
                 {
 #if defined(_WIN64) || defined(_WIN32)
                     SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
-                    printf("%s wins! Play again?\n", ms.plyNum & 1 ? "Player 1" : "Player 2");
+                    printf("%s wins! Play again?\n", ms.turn ? "Player 1" : "Player 2");
                     SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
                     puts("Y: Yes\nN: No");
 #else
-                    printf("\e[1m%s wins! Play again?\n\e[0mY: Yes\nN: No\n", ms.plyNum & 1 ? "Player 1" : "Player 2");
+                    printf("\e[1m%s wins! Play again?\n\e[0mY: Yes\nN: No\n", ms.turn ? "Player 1" : "Player 2");
 #endif
                     over = true;
                     continue;
@@ -479,17 +479,17 @@ int main(int argc, char **argv)
             Make7_print(&ms);
             oldMS = ms;
             
-            if (ms.plyNum)
+            if (Make7_plyNum(&ms))
             {
                 // Check if the move sequence results in a win, draw, or loss
                 if (Make7_tilesSumTo7(&ms))
                 {
 #if defined(_WIN64) || defined(_WIN32)
                     SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
-                    printf("Game over. %s made 7!\n", ms.plyNum & 1 ? MAKE7_P1_NAME : MAKE7_P2_NAME);
+                    printf("Game over. %s made 7!\n", ms.turn ? MAKE7_P1_NAME : MAKE7_P2_NAME);
                     SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
 #else
-                    printf("\e[1mGame over; %s made 7!\e[0m\n", ms.plyNum & 1 ? MAKE7_P1_NAME : MAKE7_P2_NAME);
+                    printf("\e[1mGame over; %s made 7!\e[0m\n", ms.turn ? MAKE7_P1_NAME : MAKE7_P2_NAME);
 #endif
                     over = true;
                 }
@@ -508,10 +508,10 @@ int main(int argc, char **argv)
                 {
 #if defined(_WIN64) || defined(_WIN32)
                     SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY);
-                    printf("%s has no more number tiles remaining. Draw!\n", ms.plyNum & 1 ? MAKE7_P2_NAME : MAKE7_P1_NAME);
+                    printf("%s has no more number tiles remaining. Draw!\n", ms.turn ? MAKE7_P2_NAME : MAKE7_P1_NAME);
                     SetConsoleTextAttribute(handle, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
 #else
-                    printf("\e[1m%s has no more number tiles remaining. Draw!\e[0m\n", ms.plyNum & 1 ? MAKE7_P2_NAME : MAKE7_P1_NAME);
+                    printf("\e[1m%s has no more number tiles remaining. Draw!\e[0m\n", ms.turn ? MAKE7_P2_NAME : MAKE7_P1_NAME);
 #endif
                     over = true;
                 }
@@ -555,7 +555,7 @@ int main(int argc, char **argv)
                 npsec = (double)(atomic_load(&nodes)) / (sec ? sec : sec + 1.0);
                 assert((r.wdl == WIN_CHAR && !(r.dt7 & 1)) || (r.wdl == DRAW_CHAR) || (r.wdl == LOSS_CHAR && (r.dt7 & 1)) || (r.wdl == UNKNOWN_CHAR));
                 assert((oldMS.player[0] == ms.player[0]) && (oldMS.player[1] == ms.player[1]) && (oldMS.tiles23[0] == ms.tiles23[0]) && (oldMS.tiles23[1] == ms.tiles23[1]));
-                assert((oldMS.plyNum == ms.plyNum) && (oldMS.remaining[0] == ms.remaining[0]) && (oldMS.remaining[1] == ms.remaining[1]) && (oldMS.remaining[2] == ms.remaining[2]));
+                assert((oldMS.turn == ms.turn) && (oldMS.remaining[0] == ms.remaining[0]) && (oldMS.remaining[1] == ms.remaining[1]) && (oldMS.remaining[2] == ms.remaining[2]));
                 printf("\a");
                 
 #if defined(_WIN64) || defined(_WIN32)

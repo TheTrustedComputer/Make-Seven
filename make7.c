@@ -6,15 +6,13 @@
 
 void Make7_initialize(Make7* restrict _m7)
 {
-    int i;
-    
     _m7->player[0] = _m7->player[1] = _m7->tiles23[0] = _m7->tiles23[1] = 0;
     _m7->remaining[0] = _m7->remaining[1] = 0xbb;
     _m7->remaining[2] = 0x44;
-    _m7->plyNum = 0;
+    _m7->turn = false;
     g_inputReadyFlag = 0;
     
-    for (i = 0; i < MAKE7_SIZE; i++)
+    for (int i = 0; i < MAKE7_SIZE; i++)
     {
         _m7->height[i] = (uint8_t)(MAKE7_SIZE_P1 * i);
     }
@@ -22,15 +20,14 @@ void Make7_initialize(Make7* restrict _m7)
 
 void Make7_print(const Make7* restrict _M7)
 {
-    uint64_t bit, ONE_TILES = (_M7->player[0] | _M7->player[1]) ^ (_M7->tiles23[0] | _M7->tiles23[1]);
-    uint8_t numOnes, numTwos, numThrees, turn = _M7->plyNum & 1;
+    uint64_t ONE_TILES = (_M7->player[0] | _M7->player[1]) ^ (_M7->tiles23[0] | _M7->tiles23[1]);
     int i, j;
     
 #if defined(_WIN64) || defined(_WIN32) // Get console handle
     HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
 #endif
     
-    if (turn) // Colorize coordinates on whose turn it is
+    if (_M7->turn) // Colorize coordinates on whose turn it is
     {
         
 #if defined(_WIN64) || defined(_WIN32)
@@ -70,7 +67,7 @@ void Make7_print(const Make7* restrict _M7)
         for (j = 0; j < MAKE7_SIZE; j++)
         {
             // Compute the tile bit position
-            bit = (1ull << (MAKE7_SIZE_P1 * j)) * (1ull << i);
+            uint64_t bit = (1ull << (MAKE7_SIZE_P1 * j)) * (1ull << i);
             
             if (bit & _M7->player[0]) // Green's tiles
             {
@@ -201,9 +198,10 @@ void Make7_print(const Make7* restrict _M7)
 #endif
     
     // Print remaining tiles
-    numOnes = turn ? (_M7->remaining[0] >> 4) : (_M7->remaining[0] & 0xf);
-    numTwos = turn ? (_M7->remaining[1] >> 4) : (_M7->remaining[1] & 0xf);
-    numThrees = turn ? (_M7->remaining[2] >> 4) : (_M7->remaining[2] & 0xf);
+    uint8_t numOnes = _M7->turn ? (_M7->remaining[0] >> 4) : (_M7->remaining[0] & 0xf);
+    uint8_t numTwos = _M7->turn ? (_M7->remaining[1] >> 4) : (_M7->remaining[1] & 0xf);
+    uint8_t numThrees = _M7->turn ? (_M7->remaining[2] >> 4) : (_M7->remaining[2] & 0xf);
+    
     printf("\n1:%u 2:%u 3:%u\n", numOnes, numTwos, numThrees);
 }
 
@@ -214,22 +212,20 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
              POS_DIAG_CHECK, NEG_DIAG_CHECK, PLAYER_ADJ_BITMASK, TILE_BIT;
     
     uint16_t adjacents;
-    uint8_t MOVES_HISTORY, PLY_M1, NUMTILE_HEIGHT, winSum, shifter, bitsetter;
+    uint8_t NUMTILE_HEIGHT, winSum, dir, shifter;
     
 #ifndef NO_SLIDERS
     uint8_t winEnd;
 #endif
     
     // Variables initialization
-    PLY_M1 = _M7->plyNum - 1;
-    MOVES_HISTORY = _M7->movesHist[PLY_M1];
-    NUMTILE_HEIGHT = _M7->height[MOVES_HISTORY & 0xf] - 1;
     ALL_TWOS_BITMASK = _M7->tiles23[0];
     ALL_THREES_BITMASK = _M7->tiles23[1];
-    PLAYER_TILES_BITMASK = _M7->player[PLY_M1 & 1];
+    PLAYER_TILES_BITMASK = _M7->player[!_M7->turn];
     PLAYER_ONES_BITMASK = PLAYER_TILES_BITMASK ^ (PLAYER_TILES_BITMASK & (ALL_TWOS_BITMASK | ALL_THREES_BITMASK));
     PLAYER_TWOS_BITMASK = PLAYER_TILES_BITMASK & ALL_TWOS_BITMASK;
     PLAYER_THREES_BITMASK = PLAYER_TILES_BITMASK & ALL_THREES_BITMASK;
+    NUMTILE_HEIGHT = _M7->height[_M7->lastTile] - 1;
     HORI_BOUND_BITMASK = MAKE7_BOT << (NUMTILE_HEIGHT & MAKE7_SIZE);
     TILE_BIT = 1ull << NUMTILE_HEIGHT;
     PLAYER_ADJ_BITMASK = ADJ_BITMASK_TABLE[NUMTILE_HEIGHT] & PLAYER_TILES_BITMASK;
@@ -239,10 +235,10 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
     NEG_DIAG_CHECK = ((TILE_BIT >> MAKE7_SIZE) | (TILE_BIT << MAKE7_SIZE)) & PLAYER_ADJ_BITMASK;
     
     // Test for all four directions and set shift direction
-    for (shifter = 0; shifter <= 3; shifter++)
+    for (dir = 0; dir <= 3; dir++)
     {
         // Set bit masks for potential wins per direction
-        switch ((bitsetter = DIRECTION_TABLE[shifter]))
+        switch ((shifter = DIRECTION_TABLE[dir]))
         {
         case 1:
             if (VERT_CHECK) // Skip a direction if there are no potential tiles
@@ -287,8 +283,8 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
             continue;
         }
         
-        // (Re)set looping variables; move tileBit to the leftmost tile before hitting an empty tile
-        for (adjacents = 0, TILE_BIT = 1ull << NUMTILE_HEIGHT; CURR_ALL_BITMASK & (TILE_BIT << bitsetter); TILE_BIT <<= bitsetter);
+        // (Re)set looping variables; move tileBit to the leftmost tile before hitting an empty cell
+        for (adjacents = 0, TILE_BIT = 1ull << NUMTILE_HEIGHT; CURR_ALL_BITMASK & (TILE_BIT << shifter); TILE_BIT <<= shifter);
         
         // Search tiles in this direction; it is guaranteed that there is at least one found adjacent tile
         // It is a 16-bit integer to store binary encoded adjacent tiles (2 bits per tile, 7 tiles max, totaling 14 bits)
@@ -312,15 +308,14 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
             }
             
             // Shift toward infinity to find the next tile
-            CURR_ONES_BITMASK <<= bitsetter;
-            CURR_TWOS_BITMASK <<= bitsetter;
-            CURR_THREES_BITMASK <<= bitsetter;
+            CURR_ONES_BITMASK <<= shifter;
+            CURR_TWOS_BITMASK <<= shifter;
+            CURR_THREES_BITMASK <<= shifter;
         }
-        while (CURR_ALL_BITMASK &= (CURR_ALL_BITMASK << bitsetter));
+        while (CURR_ALL_BITMASK &= (CURR_ALL_BITMASK << shifter));
         
         // Minimum number of adjacent tiles is 3 since this is the smallest quantity of tiles that can add to seven
         // 0x30 is the bit mask for the third adjacent tile; same as the condition if (totalTiles >= 3)
-        
         if (adjacents & 0x30)
         {
             // Sum all found adjacent tiles and see if they "Make 7".
@@ -340,7 +335,7 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
             // In other words, there can be a superset of the above eight ways of adding to 7.
             //
             // Below is a variant of the sliding window algorithm starting with a window size of 3 when the window sum is greater than 7.
-            // This approach does not use arrays; thus, it reduces the memory access overhead, making this slightly more efficient.
+            // This approach does not use traditional arrays; thus, it reduces the memory access overhead, making this slightly more efficient.
             
             // A more simpler but slower approach that doesn't use sliding windows, just sum and check. Compile with -DNO_SLIDERS to use this.
 #ifdef NO_SLIDERS
@@ -394,36 +389,39 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
     return false;
 }
 
-bool Make7_gameOver(const Make7* restrict _M7)
+inline bool Make7_gameOver(const Make7* restrict _M7)
 {
-    return _M7->plyNum && (Make7_tilesSumTo7(_M7) || Make7_noMoreMoves(_M7));
+    return Make7_tilesSumTo7(_M7) || Make7_noMoreMoves(_M7);
 }
 
 bool Make7_noMoreMoves(const Make7* restrict _M7)
 {
-    uint8_t rem1, rem2, rem3, TURN = _M7->plyNum & 1;
-    
     // Get the number of remaining tiles for that player; loop is unrolled.
-    rem1 = TURN ? (_M7->remaining[0] >> 4) : (_M7->remaining[0] & 0xf);
-    rem2 = TURN ? (_M7->remaining[1] >> 4) : (_M7->remaining[1] & 0xf);
-    rem3 = TURN ? (_M7->remaining[2] >> 4) : (_M7->remaining[2] & 0xf);
+    uint8_t rem1 = _M7->turn ? (_M7->remaining[0] >> 4) : (_M7->remaining[0] & 0xf);
+    uint8_t rem2 = _M7->turn ? (_M7->remaining[1] >> 4) : (_M7->remaining[1] & 0xf);
+    uint8_t rem3 = _M7->turn ? (_M7->remaining[2] >> 4) : (_M7->remaining[2] & 0xf);
     
     // Does the current player has 1 and 2 tiles left?
     // Yes: Play it through until the latter condition from below is met.
     // No: Does the board state allows droppable 3 tiles? If so, the player to move is able to drop them in this case.
-    return (rem1 || rem2) ? false : !(rem3 && ((_M7->player[0] | _M7->player[1]) + MAKE7_BOT) & MAKE7_THREES);
+    return !(rem1 || rem2 || (rem3 && (((_M7->player[0] | _M7->player[1]) + MAKE7_BOT) & MAKE7_THREES)));
 }
 
-bool Make7_gridFull(const Make7* restrict _M7)
+inline bool Make7_gridFull(const Make7* restrict _M7)
 {
-    return _M7->plyNum == MAKE7_AREA;
+    return Make7_plyNum(_M7) == MAKE7_AREA;
+}
+
+inline uint8_t Make7_plyNum(const Make7* restrict _M7)
+{
+    return stdc_count_ones(_M7->player[0] | _M7->player[1]);
 }
 
 bool Make7_drop(Make7* restrict _m7, const uint8_t _NUM_TILE, const uint8_t _COLUMN)
 {
     // Turn on a single bit that drops a number tile to that column
     uint64_t droppedTile = 1ull << _m7->height[_COLUMN];
-    uint8_t _NUM_TILE_M1 = _NUM_TILE - 1, TURN = _m7->plyNum & 1, tileAmount = TURN ? (_m7->remaining[_NUM_TILE_M1] >> 4) : (_m7->remaining[_NUM_TILE_M1] & 0xf);
+    uint8_t NUM_TILE_M1 = _NUM_TILE - 1, tileAmount = _m7->turn ? (_m7->remaining[NUM_TILE_M1] >> 4) : (_m7->remaining[NUM_TILE_M1] & 0xf);
     
     // Is the column not full of tiles, and does the player have any tiles left?
     if (!(droppedTile & MAKE7_TOP) && tileAmount)
@@ -435,23 +433,24 @@ bool Make7_drop(Make7* restrict _m7, const uint8_t _NUM_TILE, const uint8_t _COL
         }
         
         // This drop is legal. Now bitwise-or it with the bitmap of that player's dropped tiles
-        _m7->player[TURN] |= droppedTile;
+        _m7->player[_m7->turn] |= droppedTile;
         
         // The Make7 structure does not have any means of saving one tiles; check if this tile is not a 1 and bitwise-or to the 2-and-3 tiles variable.
         // If no bit in _m7->tiles23 is flipped on and there is a bit in _m7->player at the same spot, then it is guaranteed to be a 1 tile.
-        if (_NUM_TILE_M1)
+        if (NUM_TILE_M1)
         {
-            _m7->tiles23[_NUM_TILE_M1 - 1] |= droppedTile;
+            _m7->tiles23[NUM_TILE_M1 - 1] |= droppedTile;
         }
         
-        // Store this move to the move variation history
-        _m7->movesHist[_m7->plyNum++] = _COLUMN | (_NUM_TILE << 4);
-        
+        // Store the column index of the last dropped tile to check for win conditions
         // Increase the column height where the tile was dropped in
-        _m7->height[_COLUMN]++;
+        _m7->height[(_m7->lastTile = _COLUMN)]++;
         
         // Deduct that number's remaining tiles from the given player
-        _m7->remaining[_NUM_TILE_M1] = (TURN ? (_m7->remaining[_NUM_TILE_M1] & 0xf) : (_m7->remaining[_NUM_TILE_M1] & 0xf0)) | (--tileAmount << (TURN << 2));
+        _m7->remaining[NUM_TILE_M1] = (_m7->turn ? (_m7->remaining[NUM_TILE_M1] & 0xf) : (_m7->remaining[NUM_TILE_M1] & 0xf0)) | (--tileAmount << (_m7->turn << 2));
+        
+        // Alternate turns
+        _m7->turn = !_m7->turn;
         
         // Successful drop
         return true;
@@ -461,6 +460,7 @@ bool Make7_drop(Make7* restrict _m7, const uint8_t _NUM_TILE, const uint8_t _COL
     return false;
 }
 
+/*
 void Make7_undrop(Make7* restrict _m7)
 {
     uint8_t lastDropHeight, lastNumTile, tileAmount, TURN;
@@ -482,7 +482,7 @@ void Make7_undrop(Make7* restrict _m7)
     
     // Reverse the drop move to the state before it occurred
     _m7->remaining[lastNumTile] = (TURN ? (_m7->remaining[lastNumTile] & 0xf) : (_m7->remaining[lastNumTile] & 0xf0)) | (++tileAmount << (TURN << 2));
-}
+}*/
 
 bool Make7_getUserInput(Make7* restrict _m7, const char _INPUT)
 {
@@ -535,9 +535,9 @@ bool Make7_sequence(Make7* restrict _m7, const char* restrict _SEQ)
     return true;
 }
 
-uint64_t Make7_hashEncode(const Make7* restrict _M7)
+inline uint64_t Make7_hashEncode(const Make7* restrict _M7)
 {
-    return _M7->player[_M7->plyNum & 1] + _M7->player[0] + _M7->player[1] + MAKE7_BOT;
+    return _M7->player[_M7->turn] + _M7->player[0] + _M7->player[1] + MAKE7_BOT;
 }
 
 uint64_t Make7_reverse(uint64_t _grid)
@@ -568,25 +568,22 @@ bool Make7_symmetrical(const Make7* restrict _M7)
 
 void Make7_generate(const Make7* restrict _M7, uint8_t* restrict _list, uint8_t* restrict _count)
 {
-    uint64_t avail12Mask, avail3Mask, tileMask;
-    uint8_t _1TilesLeft, _2TilesLeft, _3TilesLeft, column, TURN;
-    
-    TURN = _M7->plyNum & 1;
-    avail12Mask = ((_M7->player[0] | _M7->player[1]) + MAKE7_BOT) & MAKE7_ALL;
-    avail3Mask = avail12Mask & MAKE7_THREES;
+    uint64_t avail12Mask = ((_M7->player[0] | _M7->player[1]) + MAKE7_BOT) & MAKE7_ALL;
+    uint64_t avail3Mask = avail12Mask & MAKE7_THREES;
     
     // Obtain tiles left for the current player
-    _1TilesLeft = TURN ? (_M7->remaining[0] >> 4) : (_M7->remaining[0] & 0xf);
-    _2TilesLeft = TURN ? (_M7->remaining[1] >> 4) : (_M7->remaining[1] & 0xf);
-    _3TilesLeft = TURN ? (_M7->remaining[2] >> 4) : (_M7->remaining[2] & 0xf);
+    uint8_t _1TilesLeft = _M7->turn ? (_M7->remaining[0] >> 4) : (_M7->remaining[0] & 0xf);
+    uint8_t _2TilesLeft = _M7->turn ? (_M7->remaining[1] >> 4) : (_M7->remaining[1] & 0xf);
+    uint8_t _3TilesLeft = _M7->turn ? (_M7->remaining[2] >> 4) : (_M7->remaining[2] & 0xf);
+    
     *_count = 0;
     
     // Generate the list of available drops
     while (avail12Mask)
     {
         // Set a single bit to a droppable column
-        tileMask = avail12Mask & -avail12Mask;
-        column = __builtin_ctzll(tileMask) >> 3; // column / MAKE7_SIZE_P1
+        uint64_t tileMask = avail12Mask & -avail12Mask;
+        uint8_t column = stdc_trailing_zeros(tileMask) >> 3; // column / MAKE7_SIZE_P1
         
         if (_1TilesLeft)
         {
@@ -611,57 +608,54 @@ void Make7_generate(const Make7* restrict _M7, uint8_t* restrict _list, uint8_t*
 
 bool Make7_checkFor7(const Make7* restrict _M7)
 {
-    Make7 check7 = *_M7;
-    uint64_t avail12Mask, avail3Mask, tileMask;
-    uint8_t _1TilesLeft, _2TilesLeft, _3TilesLeft, column, TURN;
+    uint64_t avail12Mask = ((_M7->player[0] | _M7->player[1]) + MAKE7_BOT) & MAKE7_ALL;
+    uint64_t avail3Mask = avail12Mask & MAKE7_THREES;
     
-    TURN = check7.plyNum & 1;
-    avail12Mask = ((check7.player[0] | check7.player[1]) + MAKE7_BOT) & MAKE7_ALL;
-    avail3Mask = avail12Mask & MAKE7_THREES;
+    uint8_t _1TilesLeft = _M7->turn ? (_M7->remaining[0] >> 4) : (_M7->remaining[0] & 0xf);
+    uint8_t _2TilesLeft = _M7->turn ? (_M7->remaining[1] >> 4) : (_M7->remaining[1] & 0xf);
+    uint8_t _3TilesLeft = _M7->turn ? (_M7->remaining[2] >> 4) : (_M7->remaining[2] & 0xf);
     
-    _1TilesLeft = TURN ? (check7.remaining[0] >> 4) : (check7.remaining[0] & 0xf);
-    _2TilesLeft = TURN ? (check7.remaining[1] >> 4) : (check7.remaining[1] & 0xf);
-    _3TilesLeft = TURN ? (check7.remaining[2] >> 4) : (check7.remaining[2] & 0xf);
+    Make7 checkM7 = *_M7;
     
     while (avail12Mask)
     {
-        tileMask = avail12Mask & -avail12Mask;
-        column = __builtin_ctzll(tileMask) >> 3;
+        uint64_t tileMask = avail12Mask & -avail12Mask;
+        uint8_t column = stdc_trailing_zeros(tileMask) >> 3;
         
         if (_1TilesLeft)
         {
-            Make7_drop(&check7, 1, column);
+            Make7_drop(&checkM7, 1, column);
             
-            if (Make7_tilesSumTo7(&check7))
+            if (Make7_tilesSumTo7(&checkM7))
             {
                 return true;
             }
             
-            check7 = *_M7;
+            checkM7 = *_M7;
         }
         
         if (_2TilesLeft)
         {
-            Make7_drop(&check7, 2, column);
+            Make7_drop(&checkM7, 2, column);
             
-            if (Make7_tilesSumTo7(&check7))
+            if (Make7_tilesSumTo7(&checkM7))
             {
                 return true;
             }
             
-            check7 = *_M7;
+            checkM7 = *_M7;
         }
         
         if ((avail3Mask & tileMask) && _3TilesLeft)
         {
-            Make7_drop(&check7, 3, column);
+            Make7_drop(&checkM7, 3, column);
             
-            if (Make7_tilesSumTo7(&check7))
+            if (Make7_tilesSumTo7(&checkM7))
             {
                 return true;
             }
             
-            check7 = *_M7;
+            checkM7 = *_M7;
         }
         
         avail12Mask &= ~tileMask;

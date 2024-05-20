@@ -74,7 +74,7 @@ NegamaxArgs;
 // Negamax
 void Negamax_setColumnMoveOrder(void);                                                                  // Set up the move order for the columns
 bool Negamax_checkForSeven(const Make7*);                                                               // Helper function to check for a "Make 7"		
-int Negamax_search(Make7*, TransTable*, const int, int, int);                                           // Do a negamax search on this position
+int Negamax_search(const Make7*, TransTable*, const int, int, int);                                           // Do a negamax search on this position
 int Negamax_worker(void*);                                                                              // Negamax worker thread's main function
 Result Negamax_solve(Make7*, TransTable*, const bool);                                                  // Solve this game state and return the result
 Result Negamax_solve_parallel(Make7*, const bool, Result*, Result*, Result*, Result*, uint8_t*);        // Solve it using multiple threads
