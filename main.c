@@ -265,7 +265,7 @@ int main(int argc, char **argv)
         else if (!interactive)
         {
             // Use a fixed size for the transposition table
-            if (!TransTable_initialize(&table, finalTTSize * (TT_HASHSIZE / 2)))
+            if (!TransTable_initialize(&table, finalTTSize * (TT_HASHSIZE >> 1)))
             {
                 fprintf(stderr, "Could not allocate memory for the transposition table. Please try a different size.\n"); 
                 return 1;
@@ -628,7 +628,7 @@ int main(int argc, char **argv)
                     
                     if (running)
                     {
-                        TransTable_initialize(&table, finalTTSize);
+                        TransTable_initialize(&table, table.size += 2);
                     }
                 }
             }

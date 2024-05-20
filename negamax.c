@@ -257,7 +257,7 @@ Result Negamax_solve_parallel(Make7* restrict _m7, const bool _VERBOSE, Result *
         // Start the threads
         if (!winOnFirst[thr])
         {
-            if (!TransTable_initialize(&thrTT[thr], thrTableSize + 1))
+            if (!TransTable_initialize(&thrTT[thr], thrTableSize += 2))
             {
                 fprintf(stderr, "Could not initialize the transposition table for thread #%d.\n", thr);
                 exit(EXIT_FAILURE);
@@ -307,7 +307,7 @@ Result Negamax_solve_parallel(Make7* restrict _m7, const bool _VERBOSE, Result *
                 Make7_drop(&thrArgs[finished].m7, dropList[nextUnsolved] >> 4, dropList[nextUnsolved] & 0xf);
                 TransTable_destroy(&thrTT[finished]);
                 
-                if (!TransTable_initialize(&thrTT[nextUnsolved], thrTableSize + 1))
+                if (!TransTable_initialize(&thrTT[nextUnsolved], thrTableSize += 2))
                 {
                     fprintf(stderr, "Could not reinitialize the transposition table for thread #%d.\n", finished);
                     exit(EXIT_FAILURE);
@@ -461,7 +461,7 @@ void Negamax_results(Make7* restrict _m7, Result *_r1, Result *_r2, Result *_r3,
                 else
                 {
                     TransTable_destroy(&table);
-                    TransTable_initialize(&table, table.size);
+                    TransTable_initialize(&table, table.size += 2);
                     
                     // Solve for each move, as there is no win
                     switch (tile)
