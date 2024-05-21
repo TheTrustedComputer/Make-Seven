@@ -2,7 +2,7 @@
 
 A C program to solve Make 7. It utilizes bitmaps to represent the game structure alongside necessary variables, adapted from my other project "Four the Win!", as this is the most efficient method of representation. The negamax algorithm is implemented with alpha-beta pruning, transposition table support, iterative deepening, and static move ordering to achieve fast results. Furthermore, the algorithm to check for a win uses sliding windows, a common programming technique for finding maximum sums in subarrays. There are many other optimizations that can be made to make the solver run faster. It is currently incapable of solving from the starting position in a reasonable amount of time.
 
-An alternative called Monte Carlo tree search can be used and played against. I employed solved state pruning and game theory principles to guide the algorithm to promising branches of the tree. In addition, instead of a traditional win-rate metric, I adopted a point-based metric with reward scaling, significantly reducing the susceptibility to shallow traps. However, due to the nature of Monte Carlo's stochastic sampling, it cannot be fixed at its core without introducing better heuristics or domain knowledge. Despite this limitation, it is highly parallizable; and unlike the minimax family, it can take advantage of today's multi-core processors.
+An alternative called Monte Carlo tree search can be used and played against. I employed solved state pruning and game theory principles to guide the algorithm to promising branches of the tree. In addition, instead of a traditional win-rate metric, I adopted a point-based metric with reward scaling, significantly reducing the susceptibility to shallow traps. However, due to the nature of Monte Carlo's stochastic sampling, it cannot be fixed at its core without introducing better heuristics or domain knowledge. Despite this limitation, it is highly parallelizable; and unlike the minimax family, it can take advantage of today's multi-core processors.
 
 I am open to pull requests. If you have any ideas or suggestions for improvement, please do so, and we will discuss them.
 
@@ -20,7 +20,7 @@ Make 7 is a variant of Connect 4 currently produced by Pressman Toys. In this ga
 |  -  |  -  |  -  |  -  |  -  |  -  |  -  |
 |  -  |  -  |  -  |  -  |  -  |  -  |  -  |
 
-The letters A through G denote the column index, and hyphens and equal signs mark unoccupied cells available for both 1's and 2's, and 3's, respectively. Although not shown in the table, the 1's and 2's can go where the 3's go. Mathematically, there are 8 unique possible ways to add 7, given the numbers 1, 2, and 3:
+The letters A through G denote the column index, and hyphens and equal signs mark unoccupied cells available for both 1's 2's, and 3's, respectively. Although not shown in the table, the 1's and 2's can go where the 3's go. Mathematically, there are 8 unique possible ways to add 7, given the numbers 1, 2, and 3:
 
 1. 1+1+1+1+1+1+1
 2. 2+1+1+1+1+1
@@ -41,7 +41,7 @@ You will need a C23 supported compiler; I recommend GCC 14+ as this is my main c
 
 If your system has GNU Make installed, I have attached a Makefile to simplify the building process for you. Type ```make```, and it will execute a similar command to the one above. It should not take long. Once it has finished, run the program:
 
-```./MakeSeven```
+```./Make7Solver```
 
 You should see some text that looks something like this:
 
