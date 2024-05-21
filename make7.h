@@ -31,7 +31,11 @@
 
 #include <stdio.h>
 #include <stdint.h>
+
+// MinGW does not have C23's stdbit.h header
+#if !(defined(__MINGW32__) || defined(__MINGW64__))
 #include <stdbit.h>
+#endif
 
 // Make 7's board dimensions is a fixed seven-by-seven square to take into account of the one tiles.
 #define MAKE7_SIZE 7
@@ -93,13 +97,13 @@ static const uint64_t NDIAG_BITMASK_TABLE[55] = {0x1ull, 0x102ull, 0x10204ull, 0
 // 1 1 1
 // 1 0 1
 // 1 1 1
-static const uint64_t ADJ_BITMASK_TABLE[55] = {0x302ll, 0x705ll, 0xe0all, 0x1c14ll, 0x3828ll, 0x7050ll, 0x6020ll, 0x0ll,
-                                               0x30203ll, 0x70507ll, 0xe0a0ell, 0x1c141cll, 0x382838ll, 0x705070ll, 0x602060ll, 0x0ll,
-                                               0x3020300ll, 0x7050700ll, 0xe0a0e00ll, 0x1c141c00ll, 0x38283800ll, 0x70507000ll, 0x60206000ll, 0x0ll,
-                                               0x302030000ll, 0x705070000ll, 0xe0a0e0000ll, 0x1c141c0000ll, 0x3828380000ll, 0x7050700000ll, 0x6020600000ll, 0x0ll,
-                                               0x30203000000ll, 0x70507000000ll, 0xe0a0e000000ll, 0x1c141c000000ll, 0x382838000000ll, 0x705070000000ll, 0x602060000000ll, 0x0ll,
-                                               0x3020300000000ll, 0x7050700000000ll, 0xe0a0e00000000ll, 0x1c141c00000000ll, 0x38283800000000ll, 0x70507000000000ll, 0x60206000000000ll, 0x0ll,
-                                               0x302030000000000ll, 0x705070000000000ll, 0xe0a0e0000000000ll, 0x1c141c0000000000ll, 0x3828380000000000ll, 0x7050700000000000ll, 0x6020600000000000ll};
+static const uint64_t ADJ_BITMASK_TABLE[55] = {0x302ull, 0x705ull, 0xe0aull, 0x1c14ull, 0x3828ull, 0x7050ull, 0x6020ull, 0x0ull,
+                                               0x30203ull, 0x70507ull, 0xe0a0eull, 0x1c141cull, 0x382838ull, 0x705070ull, 0x602060ull, 0x0ull,
+                                               0x3020300ull, 0x7050700ull, 0xe0a0e00ull, 0x1c141c00ull, 0x38283800ull, 0x70507000ull, 0x60206000ull, 0x0ull,
+                                               0x302030000ull, 0x705070000ull, 0xe0a0e0000ull, 0x1c141c0000ull, 0x3828380000ull, 0x7050700000ull, 0x6020600000ull, 0x0ull,
+                                               0x30203000000ull, 0x70507000000ull, 0xe0a0e000000ull, 0x1c141c000000ull, 0x382838000000ull, 0x705070000000ull, 0x602060000000ull, 0x0ull,
+                                               0x3020300000000ull, 0x7050700000000ull, 0xe0a0e00000000ull, 0x1c141c00000000ull, 0x38283800000000ull, 0x70507000000000ull, 0x60206000000000ull, 0x0ull,
+                                               0x302030000000000ull, 0x705070000000000ull, 0xe0a0e0000000000ull, 0x1c141c0000000000ull, 0x3828380000000000ull, 0x7050700000000000ull, 0x6020600000000000ull};
 
 // Direction tables to check for adjacent tiles
 static const uint8_t DIRECTION_TABLE[4] = {1, MAKE7_SIZE_P1, MAKE7_SIZE, MAKE7_SIZE_P2};

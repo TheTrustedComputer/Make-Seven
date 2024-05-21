@@ -158,7 +158,7 @@ MCTSNode *MCTS_select(MCTSNode* restrict _selector, Make7* restrict _m7)
     // As long as this node has descendants
     while (_selector->descendant)
     {
-        for (bestUCT = -INFINITY, node = 0; node < _selector->count; node++)
+        for (bestUCT = -DBL_MAX, node = 0; node < _selector->count; node++)
         {
             // Check unvisited descendant nodes; select it for expansion (same as having a UCT value of INFINITY)
             if (!_selector->descendant[node].visits)

@@ -367,7 +367,8 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
                 
                 if (winSum > 7) // Shift window to the right, subtracting the leftmost tile
                 {
-                    winSum -= (adjacents >>= 2) & 0x3;
+                    winSum -= (adjacents & 0x3);
+                    adjacents >>= 2;
                     winEnd -= 2;
                 }
                 else // Add running sum to the rightmost tile
@@ -414,7 +415,13 @@ inline bool Make7_gridFull(const Make7* restrict _M7)
 
 inline uint8_t Make7_plyNum(const Make7* restrict _M7)
 {
+    
+#if (defined(__MINGW32__) || defined(__MINGW64__))
+    return __builtin_popcountll(_M7->player[0] | _M7->player[1]);
+#else
     return stdc_count_ones(_M7->player[0] | _M7->player[1]);
+#endif
+    
 }
 
 bool Make7_drop(Make7* restrict _m7, const uint8_t _NUM_TILE, const uint8_t _COLUMN)
@@ -583,7 +590,12 @@ void Make7_generate(const Make7* restrict _M7, uint8_t* restrict _list, uint8_t*
     {
         // Set a single bit to a droppable column
         uint64_t tileMask = avail12Mask & -avail12Mask;
+        
+#if (defined(__MINGW32__) || defined(__MINGW64__))
+        uint8_t column = __builtin_ctzll(tileMask) >> 3;
+#else
         uint8_t column = stdc_trailing_zeros(tileMask) >> 3; // column / MAKE7_SIZE_P1
+#endif
         
         if (_1TilesLeft)
         {
@@ -620,7 +632,12 @@ bool Make7_checkFor7(const Make7* restrict _M7)
     while (avail12Mask)
     {
         uint64_t tileMask = avail12Mask & -avail12Mask;
+        
+#if (defined(__MINGW32__) || defined(__MINGW64__))
+        uint8_t column = __builtin_ctzll(tileMask) >> 3;
+#else
         uint8_t column = stdc_trailing_zeros(tileMask) >> 3;
+#endif
         
         if (_1TilesLeft)
         {

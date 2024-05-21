@@ -4,7 +4,7 @@
 
 #include "negamax.h"
 
-void Negamax_setColumnMoveOrder(void)
+void Negamax_setColMoveOrder(void)
 {
     for (int i = 0; i < MAKE7_SIZE; i++) // Center to outermost
     {

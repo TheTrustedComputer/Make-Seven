@@ -286,7 +286,7 @@ int main(int argc, char **argv)
     init_genrand(time(NULL) + clock());
      
     // Prepare alpha-beta move ordering array
-    Negamax_setColumnMoveOrder();
+    Negamax_setColMoveOrder();
     
     // Initialize the game with the starting position
     Make7_initialize(&ms);
@@ -430,7 +430,12 @@ int main(int argc, char **argv)
     }
     else
     {
+        
+#if (defined(__MINGW32__) || defined(__MINGW64__)) // size_t is an unsigned long long in MinGW
+        monteCarloTS ? puts("Using Monte Carlo tree search") : printf("Transposition table of %llu entries\n", table.size);
+#else
         monteCarloTS ? puts("Using Monte Carlo tree search") : printf("Transposition table of %lu entries\n", table.size);
+#endif
         
 #ifdef NO_SLIDERS
         puts("Not utilizing sliding windows");

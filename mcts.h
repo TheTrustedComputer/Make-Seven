@@ -26,6 +26,7 @@
 
 #include <time.h>
 #include <math.h>
+#include <float.h>
 #include <signal.h>
 #include <limits.h>
 #include <stddef.h>
