@@ -283,28 +283,28 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
             continue;
         }
         
-        // (Re)set looping variables; move tileBit to the leftmost tile before hitting an empty cell
+        // (Re)set looping variables; move TILE_BIT to the leftmost tile before hitting an empty cell
         for (adjacents = 0, TILE_BIT = 1ull << NUMTILE_HEIGHT; CURR_ALL_BITMASK & (TILE_BIT << shifter); TILE_BIT <<= shifter);
         
         // Search tiles in this direction; it is guaranteed that there is at least one found adjacent tile
         // It is a 16-bit integer to store binary encoded adjacent tiles (2 bits per tile, 7 tiles max, totaling 14 bits)
-        // 00: no tiles
-        // 01: tile #1
-        // 10: tile #2
-        // 11: tile #3
+        // 00: blank
+        // 01: #1 tiles
+        // 10: #2 tiles
+        // 11: #3 tiles
         do
         {
             if (CURR_ONES_BITMASK & TILE_BIT)
             {
-                adjacents = (adjacents << 2) | 1; // Found tile #1s
+                adjacents = (adjacents << 2) | 1; // Found #1 tiles
             }
             else if (CURR_TWOS_BITMASK & TILE_BIT)
             {
-                adjacents = (adjacents << 2) | 2; // Found tile #2s
+                adjacents = (adjacents << 2) | 2; // Found #2 tiles
             }
             else if (CURR_THREES_BITMASK & TILE_BIT)
             {
-                adjacents = (adjacents << 2) | 3; // Found tile #3s
+                adjacents = (adjacents << 2) | 3; // Found #3 tiles
             }
             
             // Shift toward infinity to find the next tile
@@ -314,8 +314,8 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
         }
         while (CURR_ALL_BITMASK &= (CURR_ALL_BITMASK << shifter));
         
-        // Minimum number of adjacent tiles is 3 since this is the smallest quantity of tiles that can add to seven
-        // 0x30 is the bit mask for the third adjacent tile; same as the condition if (totalTiles >= 3)
+        // Minimum number of adjacent tiles is 3 since this is the smallest quantity of tiles that can add to seven.
+        // 0x30 is the bit mask for the third adjacent tile; same as the condition if (totalTiles >= 3).
         if (adjacents & 0x30)
         {
             // Sum all found adjacent tiles and see if they "Make 7".
@@ -336,25 +336,23 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
             //
             // Below is a variant of the sliding window algorithm starting with a window size of 3 when the window sum is greater than 7.
             // This approach does not use traditional arrays; thus, it reduces the memory access overhead, making this slightly more efficient.
-            
-            // A more simpler but slower approach that doesn't use sliding windows, just sum and check. Compile with -DNO_SLIDERS to use this.
+            //
+            // A more simpler but slower approach that doesn't use sliding windows, just sum and check. Compile with -DNO_SLIDERS to use this.  
 #ifdef NO_SLIDERS
             winSum = (adjacents & 0x3) + ((adjacents & 0xc) >> 2) + ((adjacents & 0x30) >> 4);
 #else
             winSum = (adjacents & 0x3) + ((adjacents & 0xc) >> 2) + ((adjacents & 0x30) >> (winEnd = 4));
 #endif
             do
-            {
+            {           
 #ifdef NO_SLIDERS
                 // Remove the three adjacent tiles since we already added them
                 adjacents >>= 4;
-#endif
-
-                if (winSum == 7) // The current player wins if they have a subset sum of 7
+#endif          
+                if (winSum == 7) // The current player wins if they have a subset (or exact) sum of 7
                 {
                     return true;
-                }
-                
+                }              
 #ifdef NO_SLIDERS
                 if (winSum > 7) // Do not add the next tile if the sum is greater than 7   
                 {
@@ -362,9 +360,8 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
                 }
                 
                 // Shift and add the next tile to check
-                winSum += ((adjacents >>= 2) & 0x3);
-#else
-                
+                winSum += ((adjacents >>= 2) & 0x3);             
+#else               
                 if (winSum > 7) // Shift window to the right, subtracting the leftmost tile
                 {
                     winSum -= (adjacents & 0x3);
@@ -376,14 +373,13 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
                     winEnd += 2;
                     winSum += (adjacents & (0x3 << winEnd)) >> winEnd;
                 }
-#endif
+#endif     
             }
 #ifdef NO_SLIDERS
             while (adjacents);
 #else
             while (adjacents & (0x3 << winEnd));
-#endif
-        
+#endif    
         }
     }
     
@@ -426,7 +422,7 @@ inline uint8_t Make7_plyNum(const Make7* restrict _M7)
 
 bool Make7_drop(Make7* restrict _m7, const uint8_t _NUM_TILE, const uint8_t _COLUMN)
 {
-    // Turn on a single bit that drops a number tile to that column
+    // Turn on a single bit that drops a number tile to that column.
     uint64_t droppedTile = 1ull << _m7->height[_COLUMN];
     uint8_t NUM_TILE_M1 = _NUM_TILE - 1, tileAmount = _m7->turn ? (_m7->remaining[NUM_TILE_M1] >> 4) : (_m7->remaining[NUM_TILE_M1] & 0xf);
     
@@ -436,10 +432,10 @@ bool Make7_drop(Make7* restrict _m7, const uint8_t _NUM_TILE, const uint8_t _COL
         // If this tile is a 3 tile; are they dropped at their specified locations?
         if ((_NUM_TILE == 3) && !(droppedTile & MAKE7_THREES))
         {
-            return false; // The 3 tiles are not dropped to where they're supposed to be
+            return false; // The 3 tiles are not dropped to where they're supposed to be.
         }
         
-        // This drop is legal. Now bitwise-or it with the bitmap of that player's dropped tiles
+        // This drop is legal. Now bitwise-or it with the bitmap of that player's dropped tiles.
         _m7->player[_m7->turn] |= droppedTile;
         
         // The Make7 structure does not have any means of saving one tiles; check if this tile is not a 1 and bitwise-or to the 2-and-3 tiles variable.
@@ -449,21 +445,19 @@ bool Make7_drop(Make7* restrict _m7, const uint8_t _NUM_TILE, const uint8_t _COL
             _m7->tiles23[NUM_TILE_M1 - 1] |= droppedTile;
         }
         
-        // Store the column index of the last dropped tile to check for win conditions
-        // Increase the column height where the tile was dropped in
+        // Store the column index of the last dropped tile to check for win conditions.
+        // Increase the column height where the tile was dropped in.
         _m7->height[(_m7->lastTile = _COLUMN)]++;
         
-        // Deduct that number's remaining tiles from the given player
+        // Deduct that number's remaining tiles from the given player.
         _m7->remaining[NUM_TILE_M1] = (_m7->turn ? (_m7->remaining[NUM_TILE_M1] & 0xf) : (_m7->remaining[NUM_TILE_M1] & 0xf0)) | (--tileAmount << (_m7->turn << 2));
         
-        // Alternate turns
+        // Alternate turns.
         _m7->turn = !_m7->turn;
         
-        // Successful drop
         return true;
     }
     
-    // Unsuccessful drop
     return false;
 }
 
@@ -494,14 +488,14 @@ void Make7_undrop(Make7* restrict _m7)
 bool Make7_getUserInput(Make7* restrict _m7, const char _INPUT)
 {
     uint8_t number = _INPUT - '0';
-    int8_t column = _INPUT - 'A', caseTest; // Uppercase
+    int8_t column = _INPUT - 'A';
     
     if (!Make7_gameOver(_m7))
     {
         if (g_inputReadyFlag)
         {
             // Use case-insensitive input
-            for (caseTest = 0; caseTest < 2; caseTest++)
+            for (int8_t caseTest = 0; caseTest < 2; caseTest++) // Uppercase
             {
                 if (column >= 0 && column < MAKE7_SIZE)
                 {

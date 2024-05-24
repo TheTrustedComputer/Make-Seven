@@ -99,6 +99,7 @@ typedef struct
     MCTSResult *result;
     long long *iters, *seconds;
     void **winConHandle;
+    bool output;
 }
 ProgressThread;
 

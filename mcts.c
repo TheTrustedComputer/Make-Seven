@@ -152,7 +152,7 @@ void MCTS_updateState(MCTSNode* restrict _status)
 MCTSNode *MCTS_select(MCTSNode* restrict _selector, Make7* restrict _m7)
 {
     double bestUCT, currUCT;
-    MCTSNode *selected = NULL;
+    MCTSNode *selected = nullptr;
     uint8_t node;
     
     // As long as this node has descendants
@@ -274,7 +274,7 @@ void MCTS_backpropagate(MCTSNode* restrict _backpropagator, signed long long _si
  */
 MCTSResult MCTS_best(MCTSNode* restrict _root)
 {
-    MCTSNode *bestNode = NULL;
+    MCTSNode *bestNode = nullptr;
     // long double currPoints, bestPoints = -INFINITY;
     unsigned long long bestVisits;
     uint8_t node, bestState, descLosses, descDraws, descUnsolved;
@@ -379,9 +379,9 @@ int ProgressThread_print(void *_args)
     
     for (;;)
     {
-        thrd_sleep(&oneSec, NULL);
+        thrd_sleep(&oneSec, nullptr);
         
-        if (atomic_load(&runMCTS) && progress->root->state == MCTS_UNSOLVED)
+        if (atomic_load(&runMCTS) && progress->output && progress->root->state == MCTS_UNSOLVED)
         {
             *progress->result = MCTS_best(progress->root);
             MCTS_progress(progress->result, progress->winConHandle, *(progress->iters), ++(*progress->seconds), progress->root->state);
@@ -461,7 +461,7 @@ uint8_t MCTS_search(const Make7* restrict _M7, void* restrict _WIN_HND, const bo
         simulArgs[i] = (SimulThread) {.localRes = &threadSims[i],
                                       .start = &simulStart,
                                       .finish = &simulEnd,
-                                      .seed = time(NULL) + clock() + i,
+                                      .seed = time(nullptr) + clock() + i,
                                       .id = i};
                                       
         printf("%x\n", &simulArgs[i].localM7);
@@ -482,12 +482,13 @@ uint8_t MCTS_search(const Make7* restrict _M7, void* restrict _WIN_HND, const bo
     progThread = (ProgressThread) {.root = &root,
                                    .result = &result,
                                    .iters = &i,
-                                   .seconds = &secs};
+                                   .seconds = &secs,
+                                   .output = _OUTPUT};
 
 #if defined(_WIN64) || defined(_WIN32)
     progThread.winConHandle = winTerm;
 #else
-    progThread.winConHandle = NULL;
+    progThread.winConHandle = nullptr;
 #endif
     
     switch (thrd_create(&ioThread, ProgressThread_print, &progThread))
@@ -504,7 +505,7 @@ uint8_t MCTS_search(const Make7* restrict _M7, void* restrict _WIN_HND, const bo
     
     // Catch SIGINT to stop the search
     signal(SIGINT, MCTS_stop);
-    MCTSNode_initialize(&root, NULL, 0);
+    MCTSNode_initialize(&root, nullptr, 0);
     
     for (i = secs = 0; atomic_load(&runMCTS) && root.state == MCTS_UNSOLVED; i++)
     {
@@ -569,23 +570,23 @@ uint8_t MCTS_search(const Make7* restrict _M7, void* restrict _WIN_HND, const bo
         mctsM7 = *_M7;
         
         // Compute best move found and print the progress
-        /*if ((elapsed = difftime(time(NULL), progress)) >= 1)
+        /*if ((elapsed = difftime(time(nullptr), progress)) >= 1)
         {
             result = MCTS_best(&root);
             
 #if defined(_WIN64) || defined(_WIN32)
             MCTS_progress(&result, winTerm, i, ++secs, root.state);
 #else
-            MCTS_progress(&result, NULL, i, ++secs, root.state);
+            MCTS_progress(&result, nullptr, i, ++secs, root.state);
 #endif
             
-            progress = time(NULL);
+            progress = time(nullptr);
         }*/
     }
     
     // Get the best move by average points per visit
     result = MCTS_best(&root);
-    printf("\a ");
+    printf("\a");
     
     if (_OUTPUT)
     {
@@ -594,7 +595,7 @@ uint8_t MCTS_search(const Make7* restrict _M7, void* restrict _WIN_HND, const bo
 #ifdef _WIN64
             MCTS_progress(&result, winTerm, i, !secs ? 1 : secs, root.state);
 #else
-            MCTS_progress(&result, NULL, i, !secs ? 1 : secs, root.state);
+            MCTS_progress(&result, nullptr, i, !secs ? 1 : secs, root.state);
 #endif
         }
         
@@ -635,21 +636,21 @@ uint8_t MCTS_search(const Make7* restrict _M7, void* restrict _WIN_HND, const bo
 #if defined(_WIN64) || defined(_WIN32)
         MCTS_pointStats(winTerm, oneTile, twoTile, threeTile, state1, state2, state3);
 #else
-        MCTS_pointStats(NULL, oneTile, twoTile, threeTile, state1, state2, state3);
+        MCTS_pointStats(nullptr, oneTile, twoTile, threeTile, state1, state2, state3);
 #endif
         // MCTSNode_avgPoints(&root);
     }
     
     /*for (i = 0; i < numThreads; i++)
     {
-        if (thrd_join(simulators[i], NULL) == thrd_error)
+        if (thrd_join(simulators[i], nullptr) == thrd_error)
         {
             printf("Could not join simulation thread #%lld\n", i);
             exit(EXIT_FAILURE);
         }
     }*/
     
-    if (thrd_join(ioThread, NULL) == thrd_error)
+    if (thrd_join(ioThread, nullptr) == thrd_error)
     {
         puts("Could not join the I/O thread");
         exit(EXIT_FAILURE);
@@ -738,16 +739,15 @@ void MCTS_progress(const MCTSResult* restrict _RESULT, void* restrict _WIN_HND, 
     default:
         break;
     }
-
-#if defined(_WIN64) || defined(_WIN32)
-    printf("%d%c %.3f ", (_RESULT->bestMove >> 4), 'A' + (_RESULT->bestMove & 0xf), _RESULT->meanPts);
-    SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
-    printf("%llu %llu %llu", _ITERS, (_ITERS / _SECS), _SECS);
-#else
-    // printf("%d%c %.3f\e[0m %llu %llu %llu", (_RESULT->bestMove >> 4), 'A' + (_RESULT->bestMove & 0xf), _RESULT->meanPts, _ITERS, (_ITERS / _SECS), _SECS);
     
     printf("%d%c ", (_RESULT->bestMove >> 4), 'A' + (_RESULT->bestMove & 0xf));
     _STATE != MCTS_UNSOLVED ? NodeStatus_print(_STATE, false) : printf("%.3f", _RESULT->meanPts);
+    
+#if defined(_WIN64) || defined(_WIN32)
+    SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+    printf(" %llu %llu %llu", _ITERS, (_ITERS / _SECS), _SECS);
+#else
+    // printf("%d%c %.3f\e[0m %llu %llu %llu", (_RESULT->bestMove >> 4), 'A' + (_RESULT->bestMove & 0xf), _RESULT->meanPts, _ITERS, (_ITERS / _SECS), _SECS);
     printf("\e[0m %llu %llu %llu", _ITERS, (_ITERS / _SECS), _SECS);
     
 #endif
@@ -782,19 +782,38 @@ void MCTS_pointStats(void* restrict _WIN_HND, const double* restrict _1T_PTS, co
                     switch (_1T_STATES[col])
                     {
                     case MCTS_LOSS:
+#if defined(_WIN64) || defined(_WIN32)
+                        SetConsoleTextAttribute(*winTerm, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+#else
                         printf("\e[1;32m");
+#endif
                         break;
                     case MCTS_DRAW:
+#if defined(_WIN64) || defined(_WIN32)
+                        SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+#else
                         printf("\e[1;33m");
+#endif
                         break;
                     case MCTS_WIN:
+#if defined(_WIN64) || defined(_WIN32)
+                        SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_INTENSITY);
+#else
                         printf("\e[1;31m");
+#endif
                     default:
                         break;
                     }
                     
                     NodeStatus_print(_1T_STATES[col], true);
+                    
+#if defined(_WIN64) || defined(_WIN32)
+                    SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+                    printf(" ");
+#else
                     printf("\e[0m ");
+#endif
+                    
                 }               
                 else
                 {
@@ -831,6 +850,7 @@ void MCTS_pointStats(void* restrict _WIN_HND, const double* restrict _1T_PTS, co
                 
 #if defined(_WIN64) || defined(_WIN32)
                     (_1T_PTS[col] == MCTS_INVALID) ? printf("-- ") : printf("%.2f ", _1T_PTS[col]);
+                    SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
 #else
                     (_1T_PTS[col] == MCTS_INVALID) ? printf("-- ") : printf("%.2f\e[0m ", _1T_PTS[col]);
 #endif               
@@ -842,19 +862,38 @@ void MCTS_pointStats(void* restrict _WIN_HND, const double* restrict _1T_PTS, co
                     switch (_2T_STATES[col])
                     {
                     case MCTS_LOSS:
+#if defined(_WIN64) || defined(_WIN32)
+                        SetConsoleTextAttribute(*winTerm, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+#else
                         printf("\e[1;32m");
+#endif
                         break;
                     case MCTS_DRAW:
+#if defined(_WIN64) || defined(_WIN32)
+                        SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+#else
                         printf("\e[1;33m");
+#endif
                         break;
                     case MCTS_WIN:
+#if defined(_WIN64) || defined(_WIN32)
+                        SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_INTENSITY);
+#else
                         printf("\e[1;31m");
+#endif
                     default:
                         break;
                     }
                     
                     NodeStatus_print(_2T_STATES[col], true);
+                    
+#if defined(_WIN64) || defined(_WIN32)
+                    SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+                    printf(" ");
+#else
                     printf("\e[0m ");
+#endif
+                    
                 }               
                 else
                 {
@@ -891,6 +930,7 @@ void MCTS_pointStats(void* restrict _WIN_HND, const double* restrict _1T_PTS, co
                 
 #if defined(_WIN64) || defined(_WIN32)
                     (_2T_PTS[col] == MCTS_INVALID) ? printf("-- ") : printf("%.2f ", _2T_PTS[col]);
+                    SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
 #else
                     (_2T_PTS[col] == MCTS_INVALID) ? printf("-- ") : printf("%.2f\e[0m ", _2T_PTS[col]);
 #endif
@@ -902,19 +942,38 @@ void MCTS_pointStats(void* restrict _WIN_HND, const double* restrict _1T_PTS, co
                     switch (_3T_STATES[col])
                     {
                     case MCTS_LOSS:
+#if defined(_WIN64) || defined(_WIN32)
+                        SetConsoleTextAttribute(*winTerm, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+#else
                         printf("\e[1;32m");
+#endif
                         break;
                     case MCTS_DRAW:
+#if defined(_WIN64) || defined(_WIN32)
+                        SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+#else
                         printf("\e[1;33m");
+#endif
                         break;
                     case MCTS_WIN:
+#if defined(_WIN64) || defined(_WIN32)
+                        SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_INTENSITY);
+#else
                         printf("\e[1;31m");
+#endif
                     default:
                         break;
                     }
                     
                     NodeStatus_print(_3T_STATES[col], true);
+                    
+#if defined(_WIN64) || defined(_WIN32)
+                    SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+                    printf(" ");
+#else
                     printf("\e[0m ");
+#endif
+                    
                 }               
                 else
                 {
@@ -951,6 +1010,7 @@ void MCTS_pointStats(void* restrict _WIN_HND, const double* restrict _1T_PTS, co
                     
 #if defined(_WIN64) || defined(_WIN32)
                     (_3T_PTS[col] == MCTS_INVALID) ? printf("-- ") : printf("%.2f ", _3T_PTS[col]);
+                    SetConsoleTextAttribute(*winTerm, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
 #else
                     (_3T_PTS[col] == MCTS_INVALID) ? printf("-- ") : printf("%.2f\e[0m ", _3T_PTS[col]);
 #endif
@@ -973,7 +1033,7 @@ int MCTS_rootWorker(void *_args)
     long long localSim;
     
     // Reseed the RNG with a unique seed for each thread
-    init_genrand(time(NULL) + clock() + mrt->id);
+    init_genrand(time(nullptr) + clock() + mrt->id);
     
     // Run until the user stops us
     while (atomic_load(&runMCTS))
@@ -1060,7 +1120,7 @@ uint8_t MCTS_rootParallel(Make7* restrict _M7, void* restrict _WIN_HND, const bo
     
     for (thr = 0; thr < mvCount; thr++)
     {
-        MCTSNode_initialize(&thrGRoot[thr], NULL, list[thr]);
+        MCTSNode_initialize(&thrGRoot[thr], nullptr, list[thr]);
     }
     
     if (mtx_init(&rootLock, mtx_plain) != thrd_success)
@@ -1072,7 +1132,7 @@ uint8_t MCTS_rootParallel(Make7* restrict _M7, void* restrict _WIN_HND, const bo
     // Initialize thread arguments and create the threads
     for (thr = 0; thr < thrCount; thr++)
     {
-        MCTSNode_initialize(&thrLRoots[thr], NULL, 0);
+        MCTSNode_initialize(&thrLRoots[thr], nullptr, 0);
         
         thrArgs[thr] = (MCTSRootThread)
         {
@@ -1102,7 +1162,7 @@ uint8_t MCTS_rootParallel(Make7* restrict _M7, void* restrict _WIN_HND, const bo
     // Print the progress of the search every second until the user interrupts
     while (atomic_load(&runMCTS))
     {
-        thrd_sleep(&printTime, NULL);
+        thrd_sleep(&printTime, nullptr);
         mtx_lock(&rootLock);
         bestRoot = &thrGRoot[0];
         bestVis = currVis = bestRoot->visits;
@@ -1123,7 +1183,7 @@ uint8_t MCTS_rootParallel(Make7* restrict _M7, void* restrict _WIN_HND, const bo
 #if defined(_WIN64) || defined(_WIN32)
         MCTS_progress(&thrBestRes, winTerm, atomic_load(&i), ++secs, 0);
 #else
-        MCTS_progress(&thrBestRes, NULL, atomic_load(&i), ++secs, 0);
+        MCTS_progress(&thrBestRes, nullptr, atomic_load(&i), ++secs, 0);
 #endif
     
     }
@@ -1172,9 +1232,9 @@ uint8_t MCTS_rootParallel(Make7* restrict _M7, void* restrict _WIN_HND, const bo
         puts("\a");
         
 #if defined(_WIN64) || defined(_WIN32)
-        MCTS_pointStats(winTerm, gOneTile, gTwoTile, gThreeTile, NULL, NULL, NULL);
+        MCTS_pointStats(winTerm, gOneTile, gTwoTile, gThreeTile, nullptr, nullptr, nullptr);
 #else
-        MCTS_pointStats(NULL, gOneTile, gTwoTile, gThreeTile, NULL, NULL, NULL);
+        MCTS_pointStats(nullptr, gOneTile, gTwoTile, gThreeTile, nullptr, nullptr, nullptr);
 #endif
     }
 

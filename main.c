@@ -35,12 +35,6 @@
 //#include "barrier.c"
 #include "mcts.c"
 
-static inline void stopPGO(int UNUSED)
-{
-    (void)(UNUSED);
-    exit(0);
-}
-
 int main(int argc, char **argv)
 {
     /* Variable declarations */
@@ -283,7 +277,7 @@ int main(int argc, char **argv)
     }
     
     // Seed the Mersenne Twister PRNG
-    init_genrand(time(NULL) + clock());
+    init_genrand(time(nullptr) + clock());
      
     // Prepare alpha-beta move ordering array
     Negamax_setColMoveOrder();
@@ -400,7 +394,7 @@ int main(int argc, char **argv)
 #if defined(_WIN64) || defined(_WIN32)
                     mctsMove = MCTS_search(&ms, &handle, false);
 #else
-                    mctsMove = MCTS_search(&ms, NULL, false);
+                    mctsMove = MCTS_search(&ms, nullptr, false);
 #endif
                     Make7_drop(&ms, mctsMove >> 4, mctsMove & 0x7);
                     puts("");
@@ -452,9 +446,17 @@ int main(int argc, char **argv)
             // Are we running to generate a PGO (profile guided optimization) profile?
             if (pgo)
             {
-                // Disable parallelization, as it can slow down the search significantly
-                running = parallel = false;
-                signal(SIGINT, stopPGO);
+                puts("Benchmarking Negamax...");
+                Negamax_search(&ms, &table, 16, -NM_WIN, NM_WIN);
+                TransTable_destroy(&table);
+                
+                puts("Benchmarking Monte Carlo...");
+                Make7_sequence(&ms, "2d2d2c2d3d1e2b1a2b2e1e");
+                MCTS_search(&ms, nullptr, false);
+                
+                puts("All benchmarks completed.");
+                
+                return 0;
             }
             else
             {
@@ -534,7 +536,7 @@ int main(int argc, char **argv)
 #if defined(_WIN64) || defined(_WIN32)
                 parallel ? MCTS_rootParallel(&ms, &handle, true) : MCTS_search(&ms, &handle, true);
 #else
-                parallel ? MCTS_rootParallel(&ms, NULL, true) : MCTS_search(&ms, NULL, true);
+                parallel ? MCTS_rootParallel(&ms, nullptr, true) : MCTS_search(&ms, nullptr, true);
 #endif
             }
             else
@@ -545,7 +547,7 @@ int main(int argc, char **argv)
                 if (parallel)
                 {
                     clock_gettime(CLOCK_MONOTONIC, &parallelStart);
-                    r = Negamax_solve_parallel(&ms, true, r1, r2, r3, NULL, &best);
+                    r = Negamax_solve_parallel(&ms, true, r1, r2, r3, nullptr, &best);
                     clock_gettime(CLOCK_MONOTONIC, &parallelEnd);
                     sec = (double)((parallelEnd.tv_sec - parallelStart.tv_sec) + (parallelEnd.tv_nsec - parallelStart.tv_nsec) / 1000000000.0);
                 }
