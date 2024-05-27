@@ -27,7 +27,7 @@ ifeq ($(CC), gcc)
 else ifeq ($(CC), clang)
 	$(CC) $(CC_FLAGS) $(CC_RELEASE_TARGET) $(CC_LTO) -fprofile-instr-generate
 endif
-	./Make7Solver -g -t 1
+	./"$(MAKE7)" -g -t 1
 ifeq ($(CC), gcc)
 	$(CC) $(CC_FLAGS) $(CC_RELEASE_TARGET) $(CC_LTO) -fprofile-use
 else ifeq ($(CC), clang)
@@ -37,7 +37,7 @@ endif
 
 release-mingw-pgo: clean
 	$(MINGW) $(CC_FLAGS) $(MINGW_RELEASE_TARGET) $(CC_LTO) -fprofile-generate
-	./Make7Solver.exe -g -t 1
+	./"$(MAKE7)".exe -g -t 1
 	$(MINGW) $(CC_FLAGS) $(MINGW_RELEASE_TARGET) $(CC_LTO) -fprofile-use
 
 debug:
