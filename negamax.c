@@ -164,7 +164,7 @@ Result Negamax_solve_parallel(Make7* restrict _m7, const bool _VERBOSE, Result *
 #endif
     
     // Make it work with systems with low memory requirements
-    if ((thrTableSize = TransTable_prevprime((table.size + 1) / thrCount)) <= 3)
+    if ((thrTableSize = TransTable_prevprime((table.size + 2) / thrCount)) <= 3)
     {
         thrTableSize = TT_HASHSIZE;
     }
@@ -331,7 +331,7 @@ Result Negamax_solve_parallel(Make7* restrict _m7, const bool _VERBOSE, Result *
         }
         else
         {
-            // Wait for the signal from the threads
+            // Wait for a signal from the threads
             cnd_wait(&thrFinishCondV, &thrFinishMutex);
         }
         

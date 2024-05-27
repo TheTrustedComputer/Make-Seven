@@ -173,8 +173,7 @@ Result Result_getBestResult(const Result *_r1, const Result *_r2, const Result *
                 best = _r1[i];
                 score = _r1[i].wdl == DRAW_CHAR ? 1 : 2;
                 continue;
-            }
-            
+            }            
             switch (_r2[i].wdl)
             {
             case LOSS_CHAR:
@@ -188,8 +187,7 @@ Result Result_getBestResult(const Result *_r1, const Result *_r2, const Result *
                 best = _r2[i];
                 score = _r2[i].wdl == DRAW_CHAR ? 1 : 2;
                 continue;
-            }
-            
+            }         
             switch (_r3[i].wdl)
             {
             case LOSS_CHAR:
@@ -211,15 +209,13 @@ Result Result_getBestResult(const Result *_r1, const Result *_r2, const Result *
             case WIN_CHAR:
                 best = _r1[i];
                 score = 2;
-            }
-            
+            }            
             switch (_r2[i].wdl)
             {
             case WIN_CHAR:
                 best = _r2[i];
                 score = 2;
-            }
-            
+            }          
             switch (_r3[i].wdl)
             {
             case WIN_CHAR:
@@ -232,11 +228,11 @@ Result Result_getBestResult(const Result *_r1, const Result *_r2, const Result *
             {
                 best.dt7 = _r1[i].dt7;
             }
-            else if ((_r2[i].wdl == WIN_CHAR) && (_r2[i].dt7 < best.dt7))
+            if ((_r2[i].wdl == WIN_CHAR) && (_r2[i].dt7 < best.dt7))
             {
                 best.dt7 = _r2[i].dt7;
             }
-            else if ((_r3[i].wdl == WIN_CHAR) && (_r3[i].dt7 < best.dt7))
+            if ((_r3[i].wdl == WIN_CHAR) && (_r3[i].dt7 < best.dt7))
             {
                 best.dt7 = _r3[i].dt7;
             }

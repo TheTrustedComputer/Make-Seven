@@ -1,20 +1,19 @@
-## Requires GCC 14+ and Clang 18+ to compile with the C23 standard.
-## We also support MinGW but may need workarounds to make it work.
+## NOTE: Requires GCC 14+ and Clang 18+ to compile with the C23 standard.
 
 MAKE7                = Make7Solver
 CPU_ARCH             = native
 CC                   = gcc
 MINGW                = x86_64-w64-mingw32-gcc
-CC_FLAGS             = -Wall -Wextra -Ofast -s -std=c23 -funroll-loops -fmerge-all-constants -fassociative-math
+CC_FLAGS             = -Wall -Wextra -Ofast -s -std=c23 -funroll-loops -fmerge-all-constants
 CC_DEBUG             = -Wall -Wextra -Og -g -pg -std=c23
-CC_LTO               = -flto # WARNING: May cause a segmentation fault when static linking; comment to disable
+CC_LTO               = -flto # May cause a segmentation fault when static linking; comment to disable
 C_FILES              = main.c
 LIBS                 = -lm
 CC_RELEASE_TARGET    = -march=$(CPU_ARCH) $(C_FILES) -o $(MAKE7) $(LIBS) $(EXTRA_FLAGS)
 CC_DEBUG_TARGET      = -march=$(CPU_ARCH) $(C_FILES) -o $(MAKE7) $(LIBS) $(EXTRA_FLAGS)
 MINGW_RELEASE_TARGET = -march=$(CPU_ARCH) mingw_threads.c $(C_FILES) -o $(MAKE7) $(LIBS) -pthread -static $(EXTRA_FLAGS)
 MINGW_DEBUG_TARGET   = -march=$(CPU_ARCH) mingw_threads.c $(C_FILES) -o $(MAKE7) $(LIBS) -pthread -static $(EXTRA_FLAGS)
-EXTRA_FLAGS =        # Place any additional compiler flags here
+EXTRA_FLAGS          = # Place any additional compiler flags here
 
 release:
 	$(CC) $(CC_FLAGS) $(CC_RELEASE_TARGET) $(CC_LTO)
@@ -22,15 +21,13 @@ release:
 release-mingw:
 	$(MINGW) $(CC_FLAGS) $(MINGW_RELEASE_TARGET) $(CC_LTO)
 
-release-pgo:
+release-pgo: clean
 ifeq ($(CC), gcc)
 	$(CC) $(CC_FLAGS) $(CC_RELEASE_TARGET) $(CC_LTO) -fprofile-generate
 else ifeq ($(CC), clang)
 	$(CC) $(CC_FLAGS) $(CC_RELEASE_TARGET) $(CC_LTO) -fprofile-instr-generate
 endif
-	
 	./Make7Solver -g -t 1
-	
 ifeq ($(CC), gcc)
 	$(CC) $(CC_FLAGS) $(CC_RELEASE_TARGET) $(CC_LTO) -fprofile-use
 else ifeq ($(CC), clang)
@@ -38,7 +35,7 @@ else ifeq ($(CC), clang)
 	$(CC) $(CC_FLAGS) $(CC_RELEASE_TARGET) $(CC_LTO) -fprofile-instr-use=Make7Solver.profdata
 endif
 
-release-mingw-pgo:
+release-mingw-pgo: clean
 	$(MINGW) $(CC_FLAGS) $(MINGW_RELEASE_TARGET) $(CC_LTO) -fprofile-generate
 	./Make7Solver.exe -g -t 1
 	$(MINGW) $(CC_FLAGS) $(MINGW_RELEASE_TARGET) $(CC_LTO) -fprofile-use
