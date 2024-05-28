@@ -340,21 +340,19 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
             // A more simpler but slower approach that doesn't use sliding windows, just sum and check. Compile with -DNO_SLIDERS to use this.  
 #ifdef NO_SLIDERS
             winSum = (adjacents & 0x3) + ((adjacents & 0xc) >> 2) + ((adjacents & 0x30) >> 4);
+            adjacents >>= 4; // Remove the three adjacent tiles since we already added them
 #else
             winSum = (adjacents & 0x3) + ((adjacents & 0xc) >> 2) + ((adjacents & 0x30) >> (winEnd = 4));
 #endif
             do
-            {           
+            {
 #ifdef NO_SLIDERS
-                // Remove the three adjacent tiles since we already added them
-                adjacents >>= 4;
-#endif          
-                if (winSum == 7) // The current player wins if they have a subset (or exact) sum of 7
+                if (!(adjacents & 0xc) && (winSum == 7)) // Search for exact sums of 7
                 {
                     return true;
-                }              
-#ifdef NO_SLIDERS
-                if (winSum > 7) // Do not add the next tile if the sum is greater than 7   
+                }
+                
+                if (winSum >= 7) // Do not add the next tile if the sum is greater than or equal to 7   
                 {
                     break;
                 }
@@ -362,6 +360,11 @@ bool Make7_tilesSumTo7(const Make7* restrict _M7)
                 // Shift and add the next tile to check
                 winSum += ((adjacents >>= 2) & 0x3);             
 #else               
+                if (winSum == 7) // The current player wins if they have a subset (or exact) sum of 7
+                {
+                    return true;
+                }
+
                 if (winSum > 7) // Shift window to the right, subtracting the leftmost tile
                 {
                     winSum -= (adjacents & 0x3);
